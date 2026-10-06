@@ -25,6 +25,5 @@ namespace StructuredLogViewer.Browser
             return result.GetPropertyAsByteArray("bytes");
         }
 
-        public static Task InitializeAsync() => JSHost.ImportAsync(Module, "./interop.js");
     }
 }

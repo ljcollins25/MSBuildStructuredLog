@@ -21,12 +21,12 @@ namespace StructuredLogViewer.Browser
             {
                 try
                 {
-                    await JsInterop.InitializeAsync();
                     await LoadAsync();
                 }
                 catch (Exception ex)
                 {
                     text.Text = ex.ToString();
+                    JsInterop.Report("ERROR " + ex.ToString().Replace("\n", " | "));
                 }
             });
         }
@@ -45,6 +45,7 @@ namespace StructuredLogViewer.Browser
             byte[] bytes = await JsInterop.FetchBytesAsync(url);
             double t1 = JsInterop.Now();
             text.Text = $"Fetched {bytes.Length:N0} bytes in {t1 - t0:N0} ms, parsing...";
+            JsInterop.Report(text.Text);
             await System.Threading.Tasks.Task.Delay(50);
 
             var build = BinaryLog.ReadBuild(new MemoryStream(bytes));
