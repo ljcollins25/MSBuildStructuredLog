@@ -8,6 +8,7 @@
     <InvariantGlobalization>true</InvariantGlobalization>
     <!-- Avalonia's Skia backend needs the native SkiaSharp static library linked in. -->
     <WasmBuildNative>true</WasmBuildNative>
+    <EmccMaximumHeapSize>4294901760</EmccMaximumHeapSize>
   </PropertyGroup>
 
   <Import Project="build\NoWorkloadWasm.props" />
