@@ -48,7 +48,18 @@ namespace StructuredLogViewer.Browser
             JsInterop.Report(text.Text);
             await System.Threading.Tasks.Task.Delay(50);
 
-            var build = BinaryLog.ReadBuild(new MemoryStream(bytes));
+            var progress = new Progress();
+            double lastReport = 0;
+            progress.Updated += update =>
+            {
+                double now = JsInterop.Now();
+                if (now - lastReport > 2000)
+                {
+                    lastReport = now;
+                    JsInterop.Report($"progress {update.Ratio:P1} at {now - t1:N0} ms, GC heap {GC.GetTotalMemory(false) / 1048576} MB");
+                }
+            };
+            var build = BinaryLog.ReadBuild(new MemoryStream(bytes), progress, projectImportsArchive: null);
             double t2 = JsInterop.Now();
             text.Text =
                 $"Fetched {bytes.Length:N0} bytes in {t1 - t0:N0} ms\n" +
