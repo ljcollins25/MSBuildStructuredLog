@@ -56,6 +56,7 @@ namespace StructuredLogViewer.Browser
                 $"Nodes: {build.FindChildrenRecursive<BaseNode>().Count:N0}\n" +
                 $"Strings: {build.StringTable.Instances.Count():N0}\n" +
                 $"GC heap: {GC.GetTotalMemory(false) / 1048576} MB";
+            JsInterop.Report(text.Text.Replace("\n", " | "));
         }
     }
 }

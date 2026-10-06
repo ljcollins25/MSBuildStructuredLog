@@ -10,6 +10,9 @@ namespace StructuredLogViewer.Browser
         [JSImport("getQuery", Module)]
         public static partial string GetQuery();
 
+        [JSImport("report", Module)]
+        public static partial void Report(string message);
+
         [JSImport("now", Module)]
         public static partial double Now();
 

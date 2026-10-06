@@ -2,6 +2,11 @@ export function getQuery() {
     return globalThis.location.search;
 }
 
+export function report(message) {
+    console.log(message);
+    document.title = message;
+}
+
 export function now() {
     return globalThis.performance.now();
 }
