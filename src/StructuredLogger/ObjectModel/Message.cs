@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Text.RegularExpressions;
 
 namespace Microsoft.Build.Logging.StructuredLogger
@@ -39,6 +39,24 @@ namespace Microsoft.Build.Logging.StructuredLogger
     public class PropertyReassignmentMessage : PropertyAssignmentMessage
     {
         public string PreviousValue { get; set; }
+
+        /// <summary>Set (with <see cref="Column"/>) when <see cref="Text"/> is the standard reassignment message of these parts: the text is then formatted on demand, never stored.</summary>
+        public string PropertyName { get; set; }
+
+        public int Column { get; set; }
+
+        private string text;
+
+        public override string Text
+        {
+            get => text ?? (PropertyName == null ? null : FormatText(PropertyName, NewValue, PreviousValue, FilePath, Line, Column));
+            set => text = value;
+        }
+
+        public static string FormatText(string propertyName, string newValue, string previousValue, string file, int line, int column)
+        {
+            return string.Format(Strings.PropertyReassignment, propertyName, newValue, previousValue, $"{file} ({line},{column})");
+        }
     }
 
     public class Message : TextNode, IHasRelevance, IHasSourceFile, IHasLineNumber

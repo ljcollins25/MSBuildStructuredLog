@@ -645,6 +645,15 @@ namespace Microsoft.Build.Logging.StructuredLogger
                             NewValue = propertyReassignment.NewValue,
                             PreviousValue = propertyReassignment.PreviousValue
                         };
+
+                        // the text is a function of these fields: format it on demand instead of keeping it (it is the bulk of the strings of a large log)
+                        var reassignmentNode = (PropertyReassignmentMessage)messageNode;
+                        if (propertyReassignment.File != null && message == PropertyReassignmentMessage.FormatText(
+                            propertyName, propertyReassignment.NewValue, propertyReassignment.PreviousValue, propertyReassignment.File, propertyReassignment.LineNumber, propertyReassignment.ColumnNumber))
+                        {
+                            reassignmentNode.PropertyName = propertyName;
+                            reassignmentNode.Column = propertyReassignment.ColumnNumber;
+                        }
                     }
                     else if (propertyReassignmentMatch != null)
                     {
@@ -795,7 +804,11 @@ namespace Microsoft.Build.Logging.StructuredLogger
             }
             else if (nodeToAdd == null)
             {
-                message = Intern(message);
+                if (!(messageNode is PropertyReassignmentMessage { PropertyName: not null }))
+                {
+                    // interning keeps the string alive; a lazy reassignment message must not be kept
+                    message = Intern(message);
+                }
 
                 if (args is CriticalBuildMessageEventArgs criticalArgs)
                 {
@@ -850,7 +863,11 @@ namespace Microsoft.Build.Logging.StructuredLogger
                         messageNode = new Message();
                     }
 
-                    messageNode.Text = text;
+                    if (!(messageNode is PropertyReassignmentMessage { PropertyName: not null } && text == message))
+                    {
+                        messageNode.Text = text;
+                    }
+
                     messageNode.IsLowRelevance = lowRelevance;
 
                     Construction.PopulateWithExtendedData(messageNode, args);

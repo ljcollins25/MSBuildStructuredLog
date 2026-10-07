@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -70,6 +70,12 @@ namespace Microsoft.Build.Logging.StructuredLogger
             if (!propertyReassignmentCache.TryGetValue(key, out var result))
             {
                 result = FormatResourceStringIgnoreCodeAndKeyword(Strings.PropertyReassignment, propertyName, newValue, previousValue, location);
+                // bounded: the nodes format their own text on demand, this only dedups bursts of identical events
+                if (propertyReassignmentCache.Count >= 1024)
+                {
+                    propertyReassignmentCache.Clear();
+                }
+
                 propertyReassignmentCache[key] = result;
             }
 

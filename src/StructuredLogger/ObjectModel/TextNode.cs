@@ -1,8 +1,8 @@
-﻿namespace Microsoft.Build.Logging.StructuredLogger
+namespace Microsoft.Build.Logging.StructuredLogger
 {
     public class TextNode : TreeNode
     {
-        public string Text { get; set; }
+        public virtual string Text { get; set; }
         public string ShortenedText => TextUtilities.ShortenValue(Text);
         public bool IsTextShortened => Text != null && Text.Length != TextUtilities.GetShortenLength(Text);
 
