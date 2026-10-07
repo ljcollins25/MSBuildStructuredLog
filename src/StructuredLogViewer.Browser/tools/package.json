@@ -1,0 +1,16 @@
+{
+  "name": "ilspy-browser-tools",
+  "private": true,
+  "description": "Static-site staging and e2e smoke test for ILSpy.Browser (not shipped).",
+  "type": "module",
+  "scripts": {
+    "stage": "node stage.mjs",
+    "e2e": "node e2e.mjs"
+  },
+  "dependencies": {
+    "brotli-dec-wasm": "2.3.2"
+  },
+  "devDependencies": {
+    "playwright": "^1.50.0"
+  }
+}

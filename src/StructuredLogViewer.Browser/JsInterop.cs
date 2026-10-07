@@ -10,11 +10,17 @@ namespace StructuredLogViewer.Browser
         [JSImport("getQuery", Module)]
         public static partial string GetQuery();
 
-        [JSImport("report", Module)]
-        public static partial void Report(string message);
+        [JSImport("getHref", Module)]
+        public static partial string GetHref();
 
         [JSImport("now", Module)]
         public static partial double Now();
+
+        [JSImport("report", Module)]
+        public static partial void Report(string message);
+
+        [JSImport("pickFile", Module)]
+        public static partial void PickFile();
 
         [JSImport("fetchBytes", Module)]
         private static partial Task<JSObject> FetchBytes(string url);
@@ -24,6 +30,5 @@ namespace StructuredLogViewer.Browser
             using var result = await FetchBytes(url);
             return result.GetPropertyAsByteArray("bytes");
         }
-
     }
 }
