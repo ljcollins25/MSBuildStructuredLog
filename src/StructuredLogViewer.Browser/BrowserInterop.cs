@@ -171,6 +171,18 @@ namespace StructuredLogViewer.Browser
             });
         }
 
+        /// <summary>prefers-color-scheme changed (called from main.js).</summary>
+        [JSExport]
+        public static void OnSchemeChanged(bool dark) => Dispatcher.UIThread.Post(() => BrowserTheme.SchemeChanged(dark));
+
+        /// <summary>Ticks the Dark Theme checkbox on the start page like a click would; returns false when it is not shown.</summary>
+        [JSExport]
+        public static bool TickDarkThemeCheckBox(bool dark) => Dispatcher.UIThread.Invoke(() => BrowserShell.Instance.TickDarkTheme(dark));
+
+        /// <summary>The resolved theme variant and background color, to see a live switch without a screenshot.</summary>
+        [JSExport]
+        public static string GetThemeInfo() => Dispatcher.UIThread.Invoke(() => BrowserShell.Instance.ThemeInfo());
+
         [JSExport]
         public static bool GetDarkTheme() => StructuredLogViewer.SettingsService.UseDarkTheme;
 

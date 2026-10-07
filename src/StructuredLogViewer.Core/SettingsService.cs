@@ -366,11 +366,42 @@ namespace StructuredLogViewer
         }
 
         private static bool useDarkTheme = false;
+        private static bool useDarkThemeChosen = false;
+
+        /// <summary>True once the user has chosen a theme (or a saved choice was read); until then
+        /// <see cref="SetDefaultUseDarkTheme"/> (e.g. the OS / browser preference) decides.</summary>
+        public static bool UseDarkThemeChosen
+        {
+            get { EnsureSettingsRead(); return useDarkThemeChosen; }
+        }
+
         public static bool UseDarkTheme
         {
             get => Get(ref useDarkTheme);
 
-            set => Set(ref useDarkTheme, value);
+            set
+            {
+                EnsureSettingsRead();
+                if (!useDarkThemeChosen)
+                {
+                    useDarkThemeChosen = true;
+                    useDarkTheme = value;
+                    SaveSettings();
+                    return;
+                }
+
+                Set(ref useDarkTheme, value);
+            }
+        }
+
+        /// <summary>Theme to use while the user has not chosen one; not persisted.</summary>
+        public static void SetDefaultUseDarkTheme(bool dark)
+        {
+            EnsureSettingsRead();
+            if (!useDarkThemeChosen)
+            {
+                useDarkTheme = dark;
+            }
         }
 
         private static bool vsCodeHintDismissed = false;
@@ -441,7 +472,11 @@ namespace StructuredLogViewer
             //sb.AppendLine(ParentAllTargetsUnderProjectSetting + parentAllTargetsUnderProject.ToString());
             sb.AppendLine(MarkResultsInTreeSetting + markResultsInTree.ToString());
             sb.AppendLine(ShowConfigurationAndPlatformSetting + ShowConfigurationAndPlatform.ToString());
-            sb.AppendLine(UseDarkThemeSetting + useDarkTheme.ToString());
+            if (useDarkThemeChosen)
+            {
+                sb.AppendLine(UseDarkThemeSetting + useDarkTheme.ToString());
+            }
+
             sb.AppendLine(VSCodeHintDismissedSetting + vsCodeHintDismissed.ToString());
             sb.AppendLine(PreferredVSCodeVariantSetting + preferredVSCodeVariant);
             sb.AppendLine(WindowPositionSetting + windowPosition);
@@ -470,7 +505,12 @@ namespace StructuredLogViewer
                     //ProcessLine(ParentAllTargetsUnderProjectSetting, line, ref parentAllTargetsUnderProject);
                     ProcessLine(MarkResultsInTreeSetting, line, ref markResultsInTree);
                     ProcessLine(ShowConfigurationAndPlatformSetting, line, ref ProjectOrEvaluationHelper.ShowConfigurationAndPlatform);
-                    ProcessLine(UseDarkThemeSetting, line, ref useDarkTheme);
+                    if (line.StartsWith(UseDarkThemeSetting))
+                    {
+                        ProcessLine(UseDarkThemeSetting, line, ref useDarkTheme);
+                        useDarkThemeChosen = true;
+                    }
+
                     ProcessLine(VSCodeHintDismissedSetting, line, ref vsCodeHintDismissed);
                     ProcessString(PreferredVSCodeVariantSetting, line, ref preferredVSCodeVariant);
                     ProcessString(WindowPositionSetting, line, ref windowPosition);

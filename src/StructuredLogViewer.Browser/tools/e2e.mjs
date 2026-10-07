@@ -87,6 +87,32 @@ try {
     check(controls.includes('openFromUrl') && controls.includes('urlText') && !controls.includes('openProject'),
         'start page: Open from URL shown, Open Project/Solution hidden (' + controls.join(',') + ')');
     await u.page.screenshot({ path: path.join(path.dirname(path.resolve(opt.metrics || 'metrics.json')), 'e2e-0-start.png') });
+    // ---- dark theme: live switch from the start page checkbox, persisted ----
+    const info = async pg => (await pg.evaluate(() => globalThis.binlogBrowser.GetThemeInfo())).split('|');
+    const light = await info(u.page);
+    check(light[0] === 'Light', 'light theme by default (prefers light): ' + light.join('|'));
+    check(await u.page.evaluate(() => globalThis.binlogBrowser.TickDarkThemeCheckBox(true)), 'Dark Theme checkbox is on the start page');
+    await u.page.waitForTimeout(500);
+    const dark = await info(u.page);
+    check(dark[0] === 'Dark' && dark[1] !== light[1], 'ticking Dark Theme switches live, without a reload: ' + dark.join('|') + ' (was ' + light[1] + ')');
+    await u.page.screenshot({ path: path.join(path.dirname(path.resolve(opt.metrics || 'metrics.json')), 'e2e-0c-start-dark.png') });
+    check(/UseDarkTheme=True/.test(await u.page.evaluate(() => localStorage.getItem('binlog:Settings.txt')) || ''), 'the choice is saved');
+    await u.page.reload();
+    await u.until(s => s.status !== undefined, 'the app to restart', 120000);
+    check((await info(u.page))[0] === 'Dark', 'dark theme persists after a reload');
+    await u.page.evaluate(() => globalThis.binlogBrowser.TickDarkThemeCheckBox(false));
+    await u.page.waitForTimeout(300);
+    check((await info(u.page))[0] === 'Light', 'unticking switches back live');
+    // never chosen: follows prefers-color-scheme
+    const darkCtx = await browser.newContext({ colorScheme: 'dark' });
+    const pd = await visit(darkCtx, url);
+    await pd.until(s => s.status !== undefined, 'the app to start (dark scheme)', 120000);
+    await pd.page.waitForTimeout(800);
+    check((await info(pd.page))[0] === 'Dark', 'follows prefers-color-scheme: dark when never chosen');
+    await pd.page.emulateMedia({ colorScheme: 'light' });
+    await pd.page.waitForTimeout(500);
+    check((await info(pd.page))[0] === 'Light', 'and follows it live when the OS scheme changes');
+    await pd.page.close(); await darkCtx.close();
     const tryUrl = async address => u.page.evaluate(a => globalThis.binlogBrowser.OpenUrl(a), address);
     let msg = await tryUrl(otherOrigin + '/nocors.binlog');
     check(/cross-origin|CORS/i.test(msg), 'no CORS headers gives a CORS message: ' + msg.slice(0, 60));
@@ -190,8 +216,16 @@ try {
     const dlText = dl ? fs.readFileSync(await dl.path(), 'utf8') : '';
     check(!!dl && dlText.length > 0 && dl.suggestedFilename() === path.basename(opened), 'Save downloads the file: ' + (dl?.suggestedFilename() ?? 'no download') + ' (' + dlText.length + ' chars)');
 
-    // ---- settings persist in localStorage ----
+    // ---- dark theme: live switch with a log open, then persisted in localStorage ----
+    const info = () => v.page.evaluate(() => globalThis.binlogBrowser.GetThemeInfo());
+    const lightInfo = await info();
+    check(/^Light/.test(lightInfo), 'light by default (prefers light): ' + lightInfo);
+    const lightLoaded = (await v.page.evaluate(() => globalThis.binlogBrowser.GetThemeInfo())).split('|');
     check(await v.page.evaluate(() => globalThis.binlogBrowser.SetDarkTheme(true)), 'dark theme switched on');
+    const darkLoaded = (await v.page.evaluate(() => globalThis.binlogBrowser.GetThemeInfo())).split('|');
+    check(darkLoaded[0] === 'Dark' && darkLoaded[1] !== lightLoaded[1], 'with a log open the theme switches live: ' + lightLoaded[1] + ' -> ' + darkLoaded[1]);
+    const darkInfo = await info();
+    check(/^Dark/.test(darkInfo) && darkInfo !== lightInfo, 'theme changed live with a log open, no reload: ' + darkInfo);
     const stored = await v.page.evaluate(() => localStorage.getItem('binlog:Settings.txt'));
     check(!!stored && /UseDarkTheme/i.test(stored) && /true/i.test(stored), 'settings written to localStorage');
     await v.page.reload();

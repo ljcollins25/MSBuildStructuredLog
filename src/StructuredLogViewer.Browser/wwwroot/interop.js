@@ -62,3 +62,7 @@ export function downloadText(name, text) {
     setTimeout(() => URL.revokeObjectURL(url), 10000);
     globalThis.binlogLastDownload = { name, length: text.length };
 }
+
+export function prefersDark() {
+    return !!globalThis.matchMedia?.('(prefers-color-scheme: dark)').matches;
+}
