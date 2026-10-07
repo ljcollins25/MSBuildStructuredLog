@@ -161,6 +161,7 @@ namespace StructuredLogViewer.Browser
                 status.Text = "Could not open " + name + ": " + ex.Message;
                 JsInterop.Report("ERROR " + ex);
             }
+        }
 
         public string WelcomeControlsVisible()
         {
