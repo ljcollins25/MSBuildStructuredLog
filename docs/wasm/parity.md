@@ -102,9 +102,10 @@ Desktop headless benchmark (`--bench`, repeat with `src/StructuredLogViewer.Aval
 | realized rows | 50,024 | 42 |
 | collapse / re-expand | 179 / 491 ms | 75 / 78 ms |
 | time to first tree | 1,598 ms | 1,633 ms |
-| scroll to end (fixed-step) | 5.9 s, frame p95 22 ms | 9.2 s, frame p95 54 ms |
+| scroll to end (jumps of 4 viewports per frame: every row rebuilt each frame) | 5.3 s, frame median 19 ms, p95 20 ms | 9.2 s, frame median 25 ms, p95 46 ms |
+| wheel-like scroll (3 rows per frame, 300 frames) | frame median 18.8 ms, p95 19.8 ms | frame median 11.0 ms, p95 16.1 ms |
 
 Real dotnet/runtime CI binlog (largest node: 4,366 children): expand 4.9 s -> 0.4 s, realized rows 4,475 -> 37; time to first tree unchanged (34.6 s, parse dominated).
-Known cost: scrolling frames are slower than the TreeView (each frame rebinds ~40 recycled rows through the node templates); smooth in the browser e2e, but a measured regression in the headless scroll benchmark.
+Scrolling: the page-jump stress test rebuilds every visible row each frame and is slower than the TreeView (which keeps all rows alive); realistic wheel-sized scrolling is faster than the TreeView. A one-TextBlock-per-row visual was tried: it only cut the page-jump median from 25 to 17 ms (wheel: 9.5 ms) while dropping the per-type node templates, so it was not adopted. Browser frame times were not measured (the e2e checks behaviour, not frame times).
 
 Browser e2e (tools/e2e.mjs, fixture + the 50k log): default is the flat tree; a deep search result is expanded, realized and scrolled into view; right-click on a virtualized row opens the context menu; 120 Down presses cross the virtualization boundary with the selection in view; a 50,000-child node expands in ~0.4 s with 43 rows realized, collapses and re-expands (~0.27 s).
