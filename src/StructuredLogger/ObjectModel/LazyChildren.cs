@@ -109,6 +109,58 @@ namespace Microsoft.Build.Logging.StructuredLogger
         }
     }
 
+    /// <summary>
+    /// Like <see cref="LazyItems"/> for records read from the binary log, kept as two arrays (item spec, shared metadata
+    /// dictionary) instead of one TaskItemData object per item; the records are rebuilt for the time the nodes are created.
+    /// </summary>
+    internal sealed class LazyItemData : LazyChildren
+    {
+        private readonly string[] specs;
+        private readonly IDictionary<string, string>[] metadata;
+        private readonly Action<Microsoft.Build.Framework.ITaskItem, Item> addMetadata;
+
+        public LazyItemData(string[] specs, IDictionary<string, string>[] metadata, Action<Microsoft.Build.Framework.ITaskItem, Item> addMetadata)
+        {
+            this.specs = specs;
+            this.metadata = metadata;
+            this.addMetadata = addMetadata;
+        }
+
+        public override int Count => specs.Length;
+
+        public override IList<BaseNode> Create(TreeNode parent)
+        {
+            var list = new ChildrenList(specs.Length);
+            for (int i = 0; i < specs.Length; i++)
+            {
+                var item = new Item { Text = specs[i] };
+                addMetadata(new Microsoft.Build.Framework.TaskItemData(specs[i], metadata[i]), item);
+                list.Add(item);
+            }
+
+            return list;
+        }
+
+        /// <summary>The compact form of the records when all of them come from the binary reader; otherwise null.</summary>
+        public static LazyItemData TryCreate(IList<Microsoft.Build.Framework.ITaskItem> items, Action<Microsoft.Build.Framework.ITaskItem, Item> addMetadata)
+        {
+            var specs = new string[items.Count];
+            var metadata = new IDictionary<string, string>[items.Count];
+            for (int i = 0; i < specs.Length; i++)
+            {
+                if (!(items[i] is Microsoft.Build.Framework.TaskItemData data))
+                {
+                    return null;
+                }
+
+                specs[i] = data.ItemSpec;
+                metadata[i] = data.Metadata;
+            }
+
+            return new LazyItemData(specs, metadata, addMetadata);
+        }
+    }
+
     /// <summary>The children a node already has, followed by lazily created ones.</summary>
     internal sealed class LazyAfterExisting : LazyChildren
     {

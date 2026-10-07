@@ -346,8 +346,8 @@ namespace Microsoft.Build.Logging.StructuredLogger
             if (items is IList<ITaskItem> taskItems && taskItems.Count > 0)
             {
                 // keep the item records, the Item nodes and their metadata are created when the children are requested
-                var records = new List<ITaskItem>(taskItems);
-                if (parent.TrySetLazyChildren(new LazyItems(records, construction.AddMetadata)))
+                LazyChildren lazy = LazyItemData.TryCreate(taskItems, construction.AddMetadataAction) ?? (LazyChildren)new LazyItems(new List<ITaskItem>(taskItems), construction.AddMetadataAction);
+                if (parent.TrySetLazyChildren(lazy))
                 {
                     return;
                 }

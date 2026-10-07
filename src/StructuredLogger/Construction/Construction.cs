@@ -1040,6 +1040,11 @@ namespace Microsoft.Build.Logging.StructuredLogger
             }
         }
 
+        private Action<ITaskItem, Item> addMetadataAction;
+
+        /// <summary>One shared delegate; a method group would allocate one per use.</summary>
+        public Action<ITaskItem, Item> AddMetadataAction => addMetadataAction ??= AddMetadata;
+
         public void AddMetadata(ITaskItem item, Item itemNode)
         {
             var cloned = item.CloneCustomMetadata();
@@ -1152,8 +1157,7 @@ namespace Microsoft.Build.Logging.StructuredLogger
                 return;
             }
 
-            items.TrimExcess();
-            node.TrySetLazyChildren(new LazyItems(items, AddMetadata));
+            node.TrySetLazyChildren(LazyItemData.TryCreate(items, AddMetadataAction) ?? (LazyChildren)new LazyItems(items, AddMetadataAction));
         }
 
         private void AddPropertiesSorted(Folder propertiesFolder, TreeNode project, IEnumerable properties)
