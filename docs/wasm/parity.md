@@ -11,18 +11,18 @@ Counts (Avalonia): present 63, partial 0, missing 3, N/A 1  (total 67)
 | Area | Feature | Avalonia | Browser | Effort | Notes |
 |---|---|---|---|---|---|
 | Main window | File > Open Log (Ctrl+O) | present | works (file picker, drag and drop, ?url=) | - |  |
-| Main window | File > Open Graph (.dgml/.graph) | present | N/A: no file dialog path; desktop head only (graph files open via the picker) | - | GraphHostControl.FromFile; MainWindow menu + drop of .dgml/.graph/.txt |
-| Main window | File > Reload (F5) | present | N/A: no file path on disk; re-open the log | - | browser reloads from the original ?url= only |
-| Main window | File > Save Log As (Ctrl+S) | present | partial: download of a binlog written by the logger | S | verify with big logs in browser |
-| Main window | File > Redact Secrets (Ctrl+R) | present | to verify in browser | S | RedactInputControl exists |
-| Main window | File > Statistics | present | to verify in browser | S | Build.DisplayStats |
-| Main window | Recent Logs / Recent Projects, Clear | present | works (localStorage); recent logs hold names only | S | paths cannot be reopened in a browser |
+| Main window | File > Open Graph (.dgml/.graph) | present | left out of the menu: graph files open by drop; no separate dialog | - | GraphHostControl.FromFile |
+| Main window | File > Reload (F5) | present | works for a log opened from a URL (File menu, shown only then): downloads it again. Hidden for a picked or dropped file: the browser keeps no path to re-read | - | BrowserShell.lastUrl; e2e checks the menu for both |
+| Main window | File > Save Log As (Ctrl+S) | present | works: File menu, downloads the opened bytes unchanged (original file name); e2e checks name and size | - | BrowserShell.SaveLogAs, interop.js downloadBytes. Ctrl+S not bound (the browser's own save-page) |
+| Main window | File > Redact Secrets (Ctrl+R) | present | N/A for now: rewrites the log through a file save dialog and re-opens it; left out of the browser menu until a download-and-reopen flow is designed | S | RedactInputControl exists |
+| Main window | File > Statistics | present | works: File menu (binlogs only), adds the Statistics node to the tree; e2e checks it | - | BinlogStats reads a file, so the bytes are written to the in-memory file system for the call |
+| Main window | Recent Logs / Recent Projects, Clear | present | not in the browser menu: recent logs hold names only and cannot be reopened (settings still stored) | S | paths cannot be reopened in a browser |
 | Main window | Start Page, welcome screen | present | works: shared WelcomeScreen; Open Project/Solution hidden (needs MSBuild) | - | WelcomeScreen.ShowOpenProject/ShowOpenFromUrl |
 | Main window | Open from URL (start page box and ?url=) | present | works: HTTP Range when the server supports it (else one download); CORS, HTML and non-binlog responses give a clear message on the start page | - | browser-only; ILogSource/ILogSourceProvider (LogSource.cs) is the plug-in point for the paged reader; e2e covers CORS, no-Range, 404, HTML |
 | Main window | Enable tree virtualization (setting) | missing | missing: Avalonia TreeView cannot virtualize; every expanded node is a live control, so a node with ~50k children is slow and memory-hungry | L | App.xaml comment: only the root level virtualizes and it breaks AutoScrollToSelectedItem (AvaloniaUI/Avalonia#10985). Evaluated TreeDataGrid, see the section below: not adoptable (licence); a flat virtualized list is the licence-free route |
 | Main window | Build / Rebuild Solution/Project (F6, Shift+F6) | present | N/A: runs MSBuild, a browser cannot start processes | - | to hide |
 | Main window | Set MSBuild path | present | N/A: no MSBuild in a browser | - | to hide |
-| Main window | Help: Search Syntax, links, About | present | works | S | links open in a new tab |
+| Main window | Help: Search Syntax, links | present | works: Help menu with Search Syntax and the two project links, each opens in a new tab. About not added | - | JsInterop.OpenUrl |
 | Main window | Exit (Alt+F4) | present | N/A: no window to close | - | to hide |
 | Main window | Open in VS Code, VS Code variant dropdown, hint bar | missing | N/A: starts a local program | - | desktop-only; port the buttons to the Avalonia head later |
 | Main window | Attach binlog (multi-log) button | present | N/A: it only adds binlogs to the VS Code hand-off, which a browser cannot start | - | BuildControl.AttachBinlog stays for the desktop head |
