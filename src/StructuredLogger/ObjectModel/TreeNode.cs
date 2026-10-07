@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
@@ -33,7 +33,7 @@ namespace Microsoft.Build.Logging.StructuredLogger
         }
 
         private IList<BaseNode> children;
-        public bool HasChildren => children != null && children.Count > 0;
+        public bool HasChildren => children != null && (children is LazyChildren lazy ? lazy.Count > 0 : children.Count > 0);
 
         public IList<BaseNode> Children
         {
@@ -43,10 +43,57 @@ namespace Microsoft.Build.Logging.StructuredLogger
                 {
                     children = CreateChildrenList();
                 }
+                else if (children is LazyChildren)
+                {
+                    RealizeChildren();
+                }
 
                 return children;
             }
         }
+
+        private IList<BaseNode> RealizeChildren()
+        {
+            var placeholder = children as LazyChildren;
+            if (placeholder == null)
+            {
+                return children;
+            }
+
+            lock (placeholder)
+            {
+                if (ReferenceEquals(children, placeholder))
+                {
+                    var created = placeholder.Create(this);
+                    foreach (var child in created)
+                    {
+                        child.Parent = this;
+                    }
+
+                    children = created;
+                }
+            }
+
+            return children;
+        }
+
+        /// <summary>
+        /// Sets the children of a node that has none yet to be created on demand (see <see cref="LazyChildren"/>).
+        /// Returns false, and does nothing, when the node already has children.
+        /// </summary>
+        internal bool TrySetLazyChildren(LazyChildren lazy)
+        {
+            if (children != null)
+            {
+                return false;
+            }
+
+            children = lazy;
+            return true;
+        }
+
+        /// <summary>True while the children of this node are still a placeholder that was not turned into nodes.</summary>
+        internal bool HasLazyChildren => children is LazyChildren;
 
         protected ChildrenList CreateChildrenList()
         {
@@ -85,6 +132,7 @@ namespace Microsoft.Build.Logging.StructuredLogger
                 return;
             }
 
+            RealizeChildren();
             if (children == null)
             {
                 children = CreateChildrenList(capacity);
@@ -123,6 +171,7 @@ namespace Microsoft.Build.Logging.StructuredLogger
 
         public void SortChildren(Comparison<BaseNode> comparison = null)
         {
+            RealizeChildren();
             if (children == null || children.Count < 2)
             {
                 return;
@@ -150,6 +199,7 @@ namespace Microsoft.Build.Logging.StructuredLogger
 
         public void MakeChildrenObservable()
         {
+            RealizeChildren();
             if (children is ObservableCollection<BaseNode>)
             {
                 return;
@@ -170,6 +220,7 @@ namespace Microsoft.Build.Logging.StructuredLogger
 
         public void AddChildAtBeginning(BaseNode child)
         {
+            RealizeChildren();
             if (children == null)
             {
                 children = CreateChildrenList(1);
@@ -182,6 +233,7 @@ namespace Microsoft.Build.Logging.StructuredLogger
 
         public virtual void AddChild(BaseNode child)
         {
+            RealizeChildren();
             if (children == null)
             {
                 children = CreateChildrenList(1);

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
@@ -1079,27 +1079,9 @@ namespace Microsoft.Build.Logging.StructuredLogger
                     return;
                 }
 
-                itemNode.EnsureChildrenCapacity(count);
-
-                var keys = metadata.KeyArray;
-                var values = metadata.ValueArray;
-
-                for (int i = 0; i < count; i++)
-                {
-                    var key = keys[i];
-                    var value = values[i];
-
-                    var metadataNode = new Metadata
-                    {
-                        Name = key,
-                        Value = value
-                    };
-
-                    // hot path, do not use AddChild
-                    // itemNode.AddChild(metadataNode);
-                    itemNode.Children.Add(metadataNode);
-                    metadataNode.Parent = itemNode;
-                }
+                // keep the metadata as the two arrays of the shared name/value record,
+                // the Metadata nodes are only created when the children of the item are requested
+                itemNode.TrySetLazyChildren(new LazyMetadata(metadata.KeyArray, metadata.ValueArray, count));
             }
             else
             {
@@ -1336,6 +1318,33 @@ namespace Microsoft.Build.Logging.StructuredLogger
 
             parent.DisableChildrenCache = true;
 
+            string targetFramework = null;
+            string targetFrameworks = null;
+            string targetFrameworkVersion = null;
+
+            if (properties is ArrayDictionary<string, string> array && array.Count > 0 && !parent.HasChildren)
+            {
+                // keep the properties as the arrays of the dictionary, the Property nodes are only
+                // created when the children of the parent are requested
+                var keys = array.KeyArray;
+                var vals = array.ValueArray;
+                int n = array.Count;
+                if (project != null)
+                {
+                    for (int i = 0; i < n; i++)
+                    {
+                        ApplyProjectProperty(project, keys[i], vals[i], ref targetFramework, ref targetFrameworks, ref targetFrameworkVersion);
+                    }
+
+                    ApplyTargetFramework(project, targetFramework, targetFrameworks, targetFrameworkVersion);
+                }
+
+                if (parent.TrySetLazyChildren(new LazyProperties(keys, vals, n)))
+                {
+                    return;
+                }
+            }
+
             if (count > 0)
             {
                 parent.EnsureChildrenCapacity(count);
@@ -1344,10 +1353,6 @@ namespace Microsoft.Build.Logging.StructuredLogger
             {
                 parent.EnsureChildrenCapacity(collection.Count);
             }
-
-            string targetFramework = null;
-            string targetFrameworks = null;
-            string targetFrameworkVersion = null;
 
             foreach (var kvp in properties)
             {
@@ -1365,46 +1370,62 @@ namespace Microsoft.Build.Logging.StructuredLogger
 
                 if (project != null)
                 {
-                    if (string.Equals(propertyName, Strings.TargetFramework, StringComparison.OrdinalIgnoreCase))
-                    {
-                        targetFramework = propertyValue;
-                    }
-                    else if (string.Equals(propertyName, Strings.TargetFrameworks, StringComparison.OrdinalIgnoreCase))
-                    {
-                        targetFrameworks = propertyValue;
-                    }
-                    else if (string.Equals(propertyName, Strings.TargetFrameworkVersion, StringComparison.OrdinalIgnoreCase))
-                    {
-                        // Note this is untranslated, so e.g. "v4.6.2" instead of "net462" - this is intentional as it
-                        // renders the badge for all projects, but you can still use this difference to tell what is/isn't an SDK project.
-                        targetFrameworkVersion = propertyValue;
-                    }
-                    else if (string.Equals(propertyName, Strings.Platform, StringComparison.OrdinalIgnoreCase))
-                    {
-                        project.Platform = propertyValue;
-                    }
-                    else if (string.Equals(propertyName, Strings.Configuration, StringComparison.OrdinalIgnoreCase))
-                    {
-                        project.Configuration = propertyValue;
-                    }
+                    ApplyProjectProperty(project, propertyName, propertyValue, ref targetFramework, ref targetFrameworks, ref targetFrameworkVersion);
                 }
             }
 
             if (project != null)
             {
-                if (targetFramework != null)
-                {
-                    project.TargetFramework = targetFramework;
-                }
-                else if (targetFrameworks != null)
-                {
-                    project.IsOuterProject = true;
-                    project.TargetFramework = targetFrameworks;
-                }
-                else if (targetFrameworkVersion != null)
-                {
-                    project.TargetFramework = targetFrameworkVersion;
-                }
+                ApplyTargetFramework(project, targetFramework, targetFrameworks, targetFrameworkVersion);
+            }
+        }
+
+        private static void ApplyProjectProperty(
+            IProjectOrEvaluation project,
+            string propertyName,
+            string propertyValue,
+            ref string targetFramework,
+            ref string targetFrameworks,
+            ref string targetFrameworkVersion)
+        {
+            if (string.Equals(propertyName, Strings.TargetFramework, StringComparison.OrdinalIgnoreCase))
+            {
+                targetFramework = propertyValue;
+            }
+            else if (string.Equals(propertyName, Strings.TargetFrameworks, StringComparison.OrdinalIgnoreCase))
+            {
+                targetFrameworks = propertyValue;
+            }
+            else if (string.Equals(propertyName, Strings.TargetFrameworkVersion, StringComparison.OrdinalIgnoreCase))
+            {
+                // Note this is untranslated, so e.g. "v4.6.2" instead of "net462" - this is intentional as it
+                // renders the badge for all projects, but you can still use this difference to tell what is/isn't an SDK project.
+                targetFrameworkVersion = propertyValue;
+            }
+            else if (string.Equals(propertyName, Strings.Platform, StringComparison.OrdinalIgnoreCase))
+            {
+                project.Platform = propertyValue;
+            }
+            else if (string.Equals(propertyName, Strings.Configuration, StringComparison.OrdinalIgnoreCase))
+            {
+                project.Configuration = propertyValue;
+            }
+        }
+
+        private static void ApplyTargetFramework(IProjectOrEvaluation project, string targetFramework, string targetFrameworks, string targetFrameworkVersion)
+        {
+            if (targetFramework != null)
+            {
+                project.TargetFramework = targetFramework;
+            }
+            else if (targetFrameworks != null)
+            {
+                project.IsOuterProject = true;
+                project.TargetFramework = targetFrameworks;
+            }
+            else if (targetFrameworkVersion != null)
+            {
+                project.TargetFramework = targetFrameworkVersion;
             }
         }
     }
