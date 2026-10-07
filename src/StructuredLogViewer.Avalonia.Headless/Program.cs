@@ -101,7 +101,44 @@ namespace StructuredLogViewer.Avalonia
             Pump(2000);
             Save(window, Path.Combine(outDir, "desktop-5-tracing.png"));
             Console.WriteLine("tracing blocks: " + control.TracingControl.BlockCount);
-            return control.searchLogControl.ResultsList.ItemCount > 0 && control.TracingControl.BlockCount > 0 ? 0 : 1;
+
+            int graphFailures = 0;
+            var project = control.Build.FindFirstDescendant<Microsoft.Build.Logging.StructuredLogger.Project>(_ => true);
+
+            var prg = control.ProjectReferenceGraphHost;
+            Pump(1500);
+            Save(window, Path.Combine(outDir, "desktop-6-project-references.png"));
+            Console.WriteLine("project reference graph vertices: " + (prg?.GraphControl.DisplayedCount ?? -1));
+            if (prg == null || prg.GraphControl.DisplayedCount == 0) graphFailures++;
+
+            if (prg != null)
+            {
+                var first = prg.Graph.Vertices.OrderByDescending(v => v.InDegree).First();
+                prg.Locate(first.Title);
+                Pump(800);
+                Save(window, Path.Combine(outDir, "desktop-6b-project-references-selected.png"));
+                Console.WriteLine("selected: " + prg.GraphControl.SelectedVertex?.Title);
+                if (prg.GraphControl.SelectedVertex == null) graphFailures++;
+            }
+
+            var tg = control.ShowTargetGraph(project);
+            Pump(1500);
+            Save(window, Path.Combine(outDir, "desktop-7-targets.png"));
+            Console.WriteLine("target graph vertices: " + (tg?.GraphControl.DisplayedCount ?? -1));
+            if (tg == null || tg.GraphControl.DisplayedCount == 0) graphFailures++;
+
+            var ng = control.ShowNuGetGraph(project);
+            Pump(1500);
+            Save(window, Path.Combine(outDir, "desktop-8-nuget.png"));
+            Console.WriteLine("nuget graph vertices: " + (ng?.GraphControl.DisplayedCount ?? -1));
+
+            var pg = control.ShowPropertyGraph(project);
+            Pump(1500);
+            Save(window, Path.Combine(outDir, "desktop-9-properties.png"));
+            Console.WriteLine("property graph vertices: " + (pg?.GraphControl.DisplayedCount ?? -1));
+            if (pg == null || pg.GraphControl.DisplayedCount == 0) graphFailures++;
+
+            return control.searchLogControl.ResultsList.ItemCount > 0 && control.TracingControl.BlockCount > 0 && graphFailures == 0 ? 0 : 1;
         }
 
         private static void Pump(int milliseconds)

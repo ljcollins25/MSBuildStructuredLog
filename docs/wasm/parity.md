@@ -6,7 +6,7 @@ TextViewerControl and DocumentWell between the WPF and Avalonia code, plus the W
 The Avalonia column is the status of the shared UI; the browser column says works, or N/A with the reason. Effort: S hours, M a day, L several days.
 "to verify" means the code exists but is not yet exercised in the browser.
 
-Counts (Avalonia): present 53, partial 2, missing 9, N/A 1  (total 65)
+Counts (Avalonia): present 58, partial 2, missing 4, N/A 1  (total 65)
 
 | Area | Feature | Avalonia | Browser | Effort | Notes |
 |---|---|---|---|---|---|
@@ -40,10 +40,10 @@ Counts (Avalonia): present 53, partial 2, missing 9, N/A 1  (total 65)
 | Tabs | Favorites | present | works (in memory) | S | persist in localStorage? |
 | Tabs | Timeline | present | works | - | ported, bb90a59e6 |
 | Tabs | Tracing (zoom, scroll, selection) | present | works | - | ported: single-surface renderer, heat graph, ruler, drag pan, Ctrl+wheel/slider zoom, click/double-click, P2P lines, display toggles menu. Touch gestures not ported (pointer events cover touch taps) |
-| Tabs | Project References graph | missing | works once ported | L | MSAGL layout is managed; WPF GraphControl 868 + GraphHostControl 414 lines |
-| Tabs | Targets graph | missing | works once ported | L | shares the graph control |
-| Tabs | NuGet graph | missing | works once ported | M | shares the graph control |
-| Tabs | Properties graph | missing | works once ported | M | shares the graph control |
+| Tabs | Project References graph | present | works | - | ported from WPF GraphControl/GraphHostControl (layered text blocks, edges on select, path highlight, filter modes, locate, Text/Vertices). Copy screenshot not ported |
+| Tabs | Targets graph | present | works | - | ported from WPF GraphControl/GraphHostControl (layered text blocks, edges on select, path highlight, filter modes, locate, Text/Vertices). Copy screenshot not ported |
+| Tabs | NuGet graph | present | works | - | ported from WPF GraphControl/GraphHostControl (layered text blocks, edges on select, path highlight, filter modes, locate, Text/Vertices). Copy screenshot not ported |
+| Tabs | Properties graph | present | works | - | ported from WPF GraphControl/GraphHostControl (layered text blocks, edges on select, path highlight, filter modes, locate, Text/Vertices). Copy screenshot not ported |
 | Tabs | Breadcrumb bar, project context bar | present | works | - |  |
 | Tabs | Document well: source tabs, close, context | present | works | - |  |
 | Context menu | Add/Remove Favorites | present | works | - |  |
@@ -55,7 +55,7 @@ Counts (Avalonia): present 53, partial 2, missing 9, N/A 1  (total 65)
 | Context menu | Show time and duration | present | works | - |  |
 | Context menu | Go to submenu (Timeline, Tracing; Target graph pending the graph views) | present | works | - | |
 | Context menu | Sort children by name/duration, Filter children (Ctrl+F), Hide | present | works | - |  |
-| Context menu | Target graph, Property graph, NuGet graph, 'View in target graph' | missing | works once ported | S | hooks into the graph tabs |
+| Context menu | Target graph, Property graph, NuGet graph, 'View in target graph' | present | works | - | Target/Property/NuGet graph and Go to > Target graph |
 | Context menu | Run / Debug a task | missing | N/A: runs MSBuild tasks with TaskRunner | - | desktop-only, needs TaskRunner |
 | Context menu | Files tab menu: Copy, Copy All, Copy file paths, subtrees | present | works | - |  |
 | Context menu | Shared results menu (Favorites, Copy, subtrees) | present | works | - |  |

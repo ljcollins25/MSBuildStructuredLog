@@ -98,6 +98,30 @@
                     <local:TracingControl Name="tracing" IsVisible="False" />
                   </Grid>
                 </TabItem>
+
+                <TabItem Name="projectReferenceGraphTab" Header="Project References">
+                  <Grid>
+                    <TextBlock HorizontalAlignment="Center" VerticalAlignment="Center">Project reference graph</TextBlock>
+                  </Grid>
+                </TabItem>
+
+                <TabItem Name="targetGraphTab" Header="Targets" IsVisible="False">
+                  <Grid>
+                    <TextBlock HorizontalAlignment="Center" VerticalAlignment="Center">Target graph</TextBlock>
+                  </Grid>
+                </TabItem>
+
+                <TabItem Name="nugetGraphTab" Header="NuGet" IsVisible="False">
+                  <Grid>
+                    <TextBlock HorizontalAlignment="Center" VerticalAlignment="Center">NuGet graph</TextBlock>
+                  </Grid>
+                </TabItem>
+
+                <TabItem Name="propertyGraphTab" Header="Properties" IsVisible="False">
+                  <Grid>
+                    <TextBlock HorizontalAlignment="Center" VerticalAlignment="Center">Property graph</TextBlock>
+                  </Grid>
+                </TabItem>
               </TabControl>
             </local:SplitterPanel.FirstChild>
 

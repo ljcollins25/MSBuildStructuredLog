@@ -118,6 +118,15 @@ namespace StructuredLogViewer.Avalonia.Controls
         private TextBlock tracingWatermark;
         private TracingControl tracing;
         private MenuItem goToTracingItem;
+        private MenuItem targetGraphItem;
+        private MenuItem propertyGraphItem;
+        private MenuItem viewInTargetGraphItem;
+        private MenuItem nugetGraphItem;
+        private TabItem projectReferenceGraphTab;
+        private TabItem targetGraphTab;
+        private TabItem nugetGraphTab;
+        private TabItem propertyGraphTab;
+        private PropertyGraph propertyGraph;
         private MenuItem goToTimeLineItem;
         private MenuItem gotoMenuGroup;
         private ListBox breadCrumb;
@@ -312,6 +321,14 @@ namespace StructuredLogViewer.Avalonia.Controls
             goToTimeLineItem.Click += (s, a) => GoToTimeLine();
             goToTracingItem = new MenuItem() { Header = "Tracing" };
             goToTracingItem.Click += (s, a) => GoToTracing();
+            targetGraphItem = new MenuItem { Header = "Target graph" };
+            propertyGraphItem = new MenuItem { Header = "Property graph" };
+            viewInTargetGraphItem = new MenuItem { Header = "Target graph" };
+            nugetGraphItem = new MenuItem { Header = "NuGet graph" };
+            targetGraphItem.Click += (s, a) => ViewTargetGraph(treeView.SelectedItem as IProjectOrEvaluation);
+            propertyGraphItem.Click += (s, a) => ViewPropertyGraph(treeView.SelectedItem as IProjectOrEvaluation);
+            viewInTargetGraphItem.Click += (s, a) => ViewTargetGraphForTarget(treeView.SelectedItem as Target);
+            nugetGraphItem.Click += (s, a) => ViewNuGetGraph(treeView.SelectedItem as IProjectOrEvaluation);
             searchInclusiveWithinThisTimespan = new MenuItem() { Header = "Search overlapping this duration" };
             searchExclusiveWithinThisTimespan = new MenuItem() { Header = "Search within this duration" };
             favoriteItem = new MenuItem() { Header = "Add to Favorites" };
@@ -356,6 +373,10 @@ namespace StructuredLogViewer.Avalonia.Controls
             contextMenu.AddItem(openFileItem);
             contextMenu.AddItem(preprocessItem);
 
+            contextMenu.AddItem(targetGraphItem);
+            contextMenu.AddItem(propertyGraphItem);
+            contextMenu.AddItem(nugetGraphItem);
+
             contextMenu.AddItem(searchMenuGroup);
             searchMenuGroup.AddItem(searchNuGetItem);
             searchMenuGroup.AddItem(searchInSubtreeItem);
@@ -386,6 +407,7 @@ namespace StructuredLogViewer.Avalonia.Controls
             contextMenu.AddItem(gotoMenuGroup);
             gotoMenuGroup.AddItem(goToTimeLineItem);
             gotoMenuGroup.AddItem(goToTracingItem);
+            gotoMenuGroup.AddItem(viewInTargetGraphItem);
 
             contextMenu.AddItem(separator1);
 
@@ -485,6 +507,22 @@ Right-clicking a project node may show the 'Preprocess' option if the version of
             preprocessedFileManager = new PreprocessedFileManager(this.Build, sourceFileResolver);
             preprocessedFileManager.DisplayFile += filePath => DisplayFile(filePath);
             Build.TextProvider = evaluation => preprocessedFileManager.GetPreprocessedText(evaluation);
+
+            propertyGraph = new PropertyGraph(preprocessedFileManager, propertiesAndItemsSearch);
+            propertyGraph.AppendDependencyReferences = (parent, propertyNames) =>
+            {
+                var folder = new Folder { Name = "These properties also depend on:", IsExpanded = true };
+                foreach (var propertyName in propertyNames)
+                {
+                    folder.AddChild(new ButtonNode
+                    {
+                        Text = propertyName,
+                        OnClick = () => propertiesAndItemsControl.SearchText += $" \"{propertyName}\""
+                    });
+                }
+
+                parent.AddChild(folder);
+            };
 
             navigationHelper = new NavigationHelper(Build, sourceFileResolver);
             navigationHelper.OpenFileRequested += filePath => DisplayFile(filePath);
@@ -710,6 +748,10 @@ Right-clicking a project node may show the 'Preprocess' option if the version of
             centralTabControl.SelectionChanged -= CentralTabControl_SelectionChanged;
             timeline.Dispose();
             tracing.Dispose();
+            foreach (var graphTab in new[] { projectReferenceGraphTab, targetGraphTab, nugetGraphTab, propertyGraphTab })
+            {
+                (graphTab.Content as GraphHostControl)?.Dispose();
+            }
 
             UnregisterTreeViewHandlers(treeView);
             UnregisterTreeViewHandlers(searchLogControl.ResultsList);
@@ -781,6 +823,11 @@ Right-clicking a project node may show the 'Preprocess' option if the version of
             searchInclusiveWithinThisTimespan = null;
             goToTimeLineItem = null;
             goToTracingItem = null;
+            targetGraphItem = null;
+            propertyGraphItem = null;
+            viewInTargetGraphItem = null;
+            nugetGraphItem = null;
+            propertyGraph = null;
             gotoMenuGroup = null;
             searchExclusiveWithinThisTimespan = null;
             copyChildrenItem = null;
@@ -971,6 +1018,10 @@ Right-clicking a project node may show the 'Preprocess' option if the version of
             this.RegisterControl(out tracingTab, nameof(tracingTab));
             this.RegisterControl(out tracingWatermark, nameof(tracingWatermark));
             this.RegisterControl(out tracing, nameof(tracing));
+            this.RegisterControl(out projectReferenceGraphTab, nameof(projectReferenceGraphTab));
+            this.RegisterControl(out targetGraphTab, nameof(targetGraphTab));
+            this.RegisterControl(out nugetGraphTab, nameof(nugetGraphTab));
+            this.RegisterControl(out propertyGraphTab, nameof(propertyGraphTab));
             centralTabControl.SelectionChanged += CentralTabControl_SelectionChanged;
             this.RegisterControl(out breadCrumb, nameof(breadCrumb));
             this.RegisterControl(out leftPaneTabControl, nameof(leftPaneTabControl));
@@ -1057,6 +1108,136 @@ Right-clicking a project node may show the 'Preprocess' option if the version of
             {
                 PopulateTrace();
             }
+            else if (e.Source == centralTabControl && centralTabControl.SelectedItem == projectReferenceGraphTab)
+            {
+                PopulateProjectReferenceGraph();
+            }
+        }
+
+        private GraphHostControl CreateGraphHost(Digraph graph, Action<string> goToSearch, string initialSelection = null)
+        {
+            var host = new GraphHostControl(initialSelection);
+            host.DisplayText += text => DisplayText(text, "Graph");
+            host.GoToSearch += goToSearch;
+            host.Graph = graph;
+            return host;
+        }
+
+        private void ShowGraphTab(TabItem tab, GraphHostControl host)
+        {
+            (tab.Content as GraphHostControl)?.Dispose();
+            tab.Content = host;
+            tab.IsVisible = true;
+            centralTabControl.SelectedItem = tab;
+        }
+
+        private void PopulateProjectReferenceGraph()
+        {
+            if (projectReferenceGraphTab.Content is GraphHostControl || Build.ProjectReferenceGraph == null)
+            {
+                return;
+            }
+
+            projectReferenceGraphTab.Content = CreateGraphHost(
+                Build.ProjectReferenceGraph.Graph,
+                text => SelectSearchTab($"$projectreference project({text})"));
+        }
+
+        private void ViewPropertyGraph(IProjectOrEvaluation projectOrEvaluation)
+        {
+            if (projectOrEvaluation == null)
+            {
+                return;
+            }
+
+            var graph = new Digraph();
+            var context = new PropertyGraph.GraphWalkContext
+            {
+                Graph = graph,
+                Evaluation = projectOrEvaluation.GetEvaluation()
+            };
+            propertyGraph.GetPropertyGraph(context);
+
+            graph.RemoveCycles();
+            graph.CalculateHeight();
+            graph.CalculateDepth();
+            graph.ComputeTransitiveReduction();
+
+            ShowGraphTab(propertyGraphTab, CreateGraphHost(graph, text => SearchForProperty(text)));
+        }
+
+        private void ViewTargetGraph(IProjectOrEvaluation projectOrEvaluation)
+        {
+            var targetGraph = Build.TargetGraphManager.GetTargetGraph(projectOrEvaluation?.GetEvaluation(Build));
+            if (targetGraph == null)
+            {
+                return;
+            }
+
+            var project = Path.GetFileName(projectOrEvaluation.ProjectFile);
+            ShowGraphTab(targetGraphTab, CreateGraphHost(targetGraph.GetDigraph(), text => SelectSearchTab($"$target {text} project({project})")));
+        }
+
+        private void ViewTargetGraphForTarget(Target target)
+        {
+            if (target?.Project == null)
+            {
+                return;
+            }
+
+            var projectOrEvaluation = target.Project;
+            var targetGraph = Build.TargetGraphManager.GetTargetGraph(projectOrEvaluation.GetEvaluation(Build));
+            if (targetGraph == null)
+            {
+                return;
+            }
+
+            var project = Path.GetFileName(projectOrEvaluation.ProjectFile);
+            ShowGraphTab(targetGraphTab, CreateGraphHost(
+                targetGraph.GetDigraph(),
+                text => SelectSearchTab($"$target {text} project({project})"),
+                initialSelection: target.Name));
+        }
+
+        private void ViewNuGetGraph(IProjectOrEvaluation project = null)
+        {
+            var nugetSearch = Build.SearchExtensions.OfType<NuGetSearch>().FirstOrDefault();
+            var graph = nugetSearch?.GetDigraph(project?.ProjectFile);
+            if (graph == null)
+            {
+                return;
+            }
+
+            string projectText = project != null ? $" project({Path.GetFileName(project.ProjectFile)})" : " project(.)";
+            ShowGraphTab(nugetGraphTab, CreateGraphHost(graph, text => SelectSearchTab($"$nuget {text}{projectText}")));
+        }
+
+        public GraphHostControl ProjectReferenceGraphHost
+        {
+            get
+            {
+                centralTabControl.SelectedItem = projectReferenceGraphTab;
+                PopulateProjectReferenceGraph();
+                return projectReferenceGraphTab.Content as GraphHostControl;
+            }
+        }
+
+        public GraphHostControl ShowTargetGraph(IProjectOrEvaluation project)
+        {
+            ViewTargetGraph(project);
+            return targetGraphTab.Content as GraphHostControl;
+        }
+
+        public GraphHostControl ShowNuGetGraph(IProjectOrEvaluation project = null)
+        {
+            ViewNuGetGraph(project);
+            return nugetGraphTab.Content as GraphHostControl;
+        }
+
+        public GraphHostControl ShowPropertyGraph(IProjectOrEvaluation project)
+        {
+            ViewPropertyGraph(project);
+            return propertyGraphTab.Content as GraphHostControl;
         }
 
         private void PopulateTrace()
@@ -1386,6 +1567,11 @@ Recent ("));
             sortChildrenByDurationItem.IsVisible = hasChildren;
             filterChildrenItem.IsVisible = hasChildren;
             preprocessItem.IsVisible = node is IPreprocessable p && preprocessedFileManager.CanPreprocess(p);
+            bool projectOrEvaluation = node is IProjectOrEvaluation;
+            targetGraphItem.IsVisible = projectOrEvaluation;
+            viewInTargetGraphItem.IsVisible = node is Target;
+            propertyGraphItem.IsVisible = projectOrEvaluation;
+            nugetGraphItem.IsVisible = node is IProjectOrEvaluation or Package;
             hideItem.IsVisible = node is TreeNode;
             separator2.IsVisible = true;
 
