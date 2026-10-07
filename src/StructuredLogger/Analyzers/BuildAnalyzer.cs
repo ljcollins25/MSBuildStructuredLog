@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using StructuredLogViewer;
@@ -118,7 +118,8 @@ namespace Microsoft.Build.Logging.StructuredLogger
 
             ProcessBeforeChildrenVisited(node);
 
-            if (node.HasChildren)
+            // placeholder children are only items, metadata and properties: nothing to analyze, and visiting would create them
+            if (node.HasChildren && !node.HasUnrealizedChildren)
             {
                 var children = node.Children;
                 for (int i = 0; i < children.Count; i++)

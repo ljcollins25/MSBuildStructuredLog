@@ -33,6 +33,9 @@ namespace Microsoft.Build.Logging.StructuredLogger
         }
 
         private IList<BaseNode> children;
+        /// <summary>True while the children are only a placeholder (items, metadata, properties not created yet); asking for them would create the nodes.</summary>
+        internal bool HasUnrealizedChildren => children is LazyChildren;
+
         public bool HasChildren => children != null && children.Count > 0;
 
         public IList<BaseNode> Children
