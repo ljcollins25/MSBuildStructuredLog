@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.IO;
 using System.Security.Cryptography;
 using System.Text;
@@ -39,12 +39,25 @@ namespace StructuredLogViewer
 
         public static string GetMD5Hash(string input, int digits)
         {
-            using (var md5 = MD5.Create())
+            var bytes = Encoding.UTF8.GetBytes(input);
+            byte[] hashBytes;
+            try
             {
-                var bytes = Encoding.UTF8.GetBytes(input);
-                var hashBytes = md5.ComputeHash(bytes);
-                return ByteArrayToHexString(hashBytes, digits);
+                using (var md5 = MD5.Create())
+                {
+                    hashBytes = md5.ComputeHash(bytes);
+                }
             }
+            catch (Exception)
+            {
+                // MD5 is not available on some platforms (browser WebAssembly); the hash only names a temp file
+                using (var sha = SHA256.Create())
+                {
+                    hashBytes = sha.ComputeHash(bytes);
+                }
+            }
+
+            return ByteArrayToHexString(hashBytes, digits);
         }
 
         public static string InsertMissingDriveSeparator(string sourceFilePath)
