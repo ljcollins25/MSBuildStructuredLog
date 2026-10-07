@@ -1,6 +1,6 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             xmlns:local="clr-namespace:StructuredLogViewer.Avalonia.Controls;assembly=StructuredLogViewer.Avalonia"
+             xmlns:local="clr-namespace:StructuredLogViewer.Avalonia.Controls;assembly=StructuredLogViewer.Avalonia.Core"
              xmlns:a="clr-namespace:AvaloniaEdit;assembly=AvaloniaEdit"
              x:Class="StructuredLogViewer.Avalonia.Controls.TextViewerControl">
   <Grid RowDefinitions="Auto,*">
