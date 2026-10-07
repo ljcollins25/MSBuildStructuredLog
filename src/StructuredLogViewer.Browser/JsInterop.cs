@@ -19,6 +19,15 @@ namespace StructuredLogViewer.Browser
         [JSImport("report", Module)]
         public static partial void Report(string message);
 
+        [JSImport("storageGet", Module)]
+        public static partial string StorageGet(string key);
+
+        [JSImport("storageSet", Module)]
+        public static partial void StorageSet(string key, string value);
+
+        [JSImport("downloadText", Module)]
+        public static partial void DownloadText(string name, string text);
+
         [JSImport("pickFile", Module)]
         public static partial void PickFile();
 

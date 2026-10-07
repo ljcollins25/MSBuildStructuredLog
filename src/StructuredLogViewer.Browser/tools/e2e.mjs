@@ -92,6 +92,29 @@ try {
     check(!!opened, 'a source file from the archive opens in the text viewer: ' + opened);
     await v.page.waitForTimeout(1500);
     await shot('e2e-3-source.png');
+
+    // ---- shared-UI commands that need browser support ----
+    const buttons = await v.page.evaluate(() => globalThis.binlogBrowser.VisibleViewerButtons());
+    check(buttons.includes('save') && !buttons.includes('openInExternalEditor'), 'source toolbar: Save shown, Open in external editor hidden');
+    await context.grantPermissions(['clipboard-read', 'clipboard-write'], { origin });
+    await v.page.evaluate(() => globalThis.binlogBrowser.ClickViewerButton('copyFullPath'));
+    await v.page.waitForTimeout(500);
+    const clip = await v.page.evaluate(() => navigator.clipboard.readText()).catch(e => 'ERR ' + e.message);
+    check(clip === opened, 'Copy Path puts the file path on the clipboard: ' + String(clip).slice(0, 80));
+    const download = v.page.waitForEvent('download', { timeout: 10000 }).catch(() => null);
+    await v.page.evaluate(() => globalThis.binlogBrowser.ClickViewerButton('save'));
+    const dl = await download;
+    const dlText = dl ? fs.readFileSync(await dl.path(), 'utf8') : '';
+    check(!!dl && dlText.length > 0 && dl.suggestedFilename() === path.basename(opened), 'Save downloads the file: ' + (dl?.suggestedFilename() ?? 'no download') + ' (' + dlText.length + ' chars)');
+
+    // ---- settings persist in localStorage ----
+    check(await v.page.evaluate(() => globalThis.binlogBrowser.SetDarkTheme(true)), 'dark theme switched on');
+    const stored = await v.page.evaluate(() => localStorage.getItem('binlog:Settings.txt'));
+    check(!!stored && /UseDarkTheme/i.test(stored) && /true/i.test(stored), 'settings written to localStorage');
+    await v.page.reload();
+    await v.until(s => s.status !== undefined, 'the app to restart', 120000);
+    check(await v.page.evaluate(() => globalThis.binlogBrowser.GetDarkTheme()), 'dark theme restored after reload');
+    await v.page.evaluate(() => globalThis.binlogBrowser.SetDarkTheme(false));
     check(v.errors.length === 0, 'no console errors (drop)' + (v.errors.length ? ': ' + v.errors.slice(0, 3).join(' | ') : ''));
     check(v.failed.length === 0, 'no failed requests (drop)' + (v.failed.length ? ': ' + v.failed.slice(0, 3).join(' | ') : ''));
     await v.page.close();

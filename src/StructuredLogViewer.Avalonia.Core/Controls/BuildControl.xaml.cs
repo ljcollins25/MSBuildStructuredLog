@@ -515,6 +515,11 @@ Right-clicking a project node may show the 'Preprocess' option if the version of
         /// </summary>
         public void OpenInVSCode(VSCodeInstallation installation = null)
         {
+            if (!PlatformCapabilities.CanLaunchProcesses)
+            {
+                return;
+            }
+
             var binlogPath = Build?.LogFilePath;
             if (string.IsNullOrEmpty(binlogPath))
             {
@@ -620,6 +625,11 @@ Right-clicking a project node may show the 'Preprocess' option if the version of
         public static List<VSCodeInstallation> FindVSCodeInstallations()
         {
             var installations = new List<VSCodeInstallation>();
+            if (!PlatformCapabilities.CanLaunchProcesses)
+            {
+                return installations;
+            }
+
 
             var variants = new[]
             {
@@ -1272,7 +1282,7 @@ Recent ("));
             searchNuGetItem.IsVisible = node is IProjectOrEvaluation;
             openFileItem.IsVisible = CanOpenFile(node);
             copyFilePathItem.IsVisible = node is Import || (node is IHasSourceFile file && !string.IsNullOrEmpty(file.SourceFilePath));
-            showFileInExplorerItem.IsVisible = CanShowInExplorer();
+            showFileInExplorerItem.IsVisible = PlatformCapabilities.CanLaunchProcesses && CanShowInExplorer();
             var hasChildren = node is TreeNode t && t.HasChildren;
             copySubtreeItem.IsVisible = hasChildren;
             copyVisibleSubtreeItem.IsVisible = hasChildren;

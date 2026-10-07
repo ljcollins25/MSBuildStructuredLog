@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
@@ -16,6 +16,9 @@ namespace StructuredLogViewer
     public class SettingsService
     {
         private const int maxCount = 10;
+
+        /// <summary>Where settings are kept; a head without a file system (the browser) replaces it at startup.</summary>
+        public static ISettingsStore Store { get; set; } = new FileSettingsStore();
 
         // TODO: protect access to these with a Mutex
         private static readonly string recentLogsFilePath = Path.Combine(GetRootPath(), "RecentLogs.txt");
@@ -144,14 +147,14 @@ namespace StructuredLogViewer
 
         private static IEnumerable<string> GetRecentItems(string storageFilePath)
         {
-            using (SingleGlobalInstance.Acquire(Path.GetFileName(storageFilePath)))
+            using (Store.Lock(Path.GetFileName(storageFilePath)))
             {
-                if (!File.Exists(storageFilePath))
+                if (!Store.Exists(storageFilePath))
                 {
                     return Array.Empty<string>();
                 }
 
-                var lines = File.ReadAllLines(storageFilePath);
+                var lines = Store.ReadAllLines(storageFilePath);
                 return lines;
             }
         }
@@ -170,11 +173,9 @@ namespace StructuredLogViewer
 
         private static void SaveText(string storageFilePath, IEnumerable<string> lines)
         {
-            using (SingleGlobalInstance.Acquire(Path.GetFileName(storageFilePath)))
+            using (Store.Lock(Path.GetFileName(storageFilePath)))
             {
-                string directoryName = Path.GetDirectoryName(storageFilePath);
-                Directory.CreateDirectory(directoryName);
-                File.WriteAllLines(storageFilePath, lines);
+                Store.WriteAllLines(storageFilePath, lines);
             }
         }
 
@@ -220,14 +221,14 @@ namespace StructuredLogViewer
         {
             string[] lines;
 
-            using (SingleGlobalInstance.Acquire(Path.GetFileName(customArgumentsFilePath)))
+            using (Store.Lock(Path.GetFileName(customArgumentsFilePath)))
             {
-                if (!File.Exists(customArgumentsFilePath))
+                if (!Store.Exists(customArgumentsFilePath))
                 {
                     return DefaultArguments;
                 }
 
-                lines = File.ReadAllLines(customArgumentsFilePath);
+                lines = Store.ReadAllLines(customArgumentsFilePath);
             }
 
             if (FindArguments(lines, filePath, out string? arguments, out int index))
@@ -244,7 +245,7 @@ namespace StructuredLogViewer
         /// <summary>
         /// Just an escape hatch in case some users might want it
         /// </summary>
-        public static bool DisableUpdates => File.Exists(disableUpdatesFilePath);
+        public static bool DisableUpdates => Store.Exists(disableUpdatesFilePath);
 
         private static bool FindArguments(IList<string> lines, string projectFilePath, [NotNullWhen(returnValue: true)] out string? existingArguments, out int index)
         {
@@ -279,9 +280,9 @@ namespace StructuredLogViewer
 
         public static void SaveCustomArguments(string projectFilePath, string newArguments)
         {
-            using (SingleGlobalInstance.Acquire(Path.GetFileName(customArgumentsFilePath)))
+            using (Store.Lock(Path.GetFileName(customArgumentsFilePath)))
             {
-                if (!File.Exists(customArgumentsFilePath))
+                if (!Store.Exists(customArgumentsFilePath))
                 {
                     if (newArguments == DefaultArguments)
                     {
@@ -289,14 +290,12 @@ namespace StructuredLogViewer
                     }
                     else
                     {
-                        string directoryName = Path.GetDirectoryName(customArgumentsFilePath);
-                        Directory.CreateDirectory(directoryName);
-                        File.WriteAllLines(customArgumentsFilePath, new[] {projectFilePath + "=" + newArguments});
+                        Store.WriteAllLines(customArgumentsFilePath, new[] {projectFilePath + "=" + newArguments});
                         return;
                     }
                 }
 
-                var list = File.ReadAllLines(customArgumentsFilePath).ToList();
+                var list = Store.ReadAllLines(customArgumentsFilePath).ToList();
 
                 if (FindArguments(list, projectFilePath, out string? arguments, out int index))
                 {
@@ -309,7 +308,7 @@ namespace StructuredLogViewer
                     list.RemoveAt(list.Count - 1);
                 }
 
-                File.WriteAllLines(customArgumentsFilePath, list);
+                Store.WriteAllLines(customArgumentsFilePath, list);
             }
         }
 
@@ -449,24 +448,22 @@ namespace StructuredLogViewer
             sb.AppendLine(AvaloniaWindowPositionSetting + avaloniaWindowPosition);
             sb.AppendLine(IgnoreEmbeddedFilesSetting + IgnoreEmbeddedFiles);
 
-            using (SingleGlobalInstance.Acquire(Path.GetFileName(settingsFilePath)))
+            using (Store.Lock(Path.GetFileName(settingsFilePath)))
             {
-                string directoryName = Path.GetDirectoryName(settingsFilePath);
-                Directory.CreateDirectory(directoryName);
-                File.WriteAllText(settingsFilePath, sb.ToString());
+                Store.WriteAllText(settingsFilePath, sb.ToString());
             }
         }
 
         private static void ReadSettings()
         {
-            using (SingleGlobalInstance.Acquire(Path.GetFileName(settingsFilePath)))
+            using (Store.Lock(Path.GetFileName(settingsFilePath)))
             {
-                if (!File.Exists(settingsFilePath))
+                if (!Store.Exists(settingsFilePath))
                 {
                     return;
                 }
 
-                var lines = File.ReadAllLines(settingsFilePath);
+                var lines = Store.ReadAllLines(settingsFilePath);
                 foreach (var line in lines)
                 {
                     ProcessLine(Virtualization, line, ref enableTreeViewVirtualization);
@@ -522,7 +519,7 @@ namespace StructuredLogViewer
             var folder = tempFolder;
             var filePath = GetPreprocessedFilePath(content, fileExtension);
 
-            using (SingleGlobalInstance.Acquire(Path.GetFileName(filePath)))
+            using (Store.Lock(Path.GetFileName(filePath)))
             {
                 if (File.Exists(filePath))
                 {
@@ -546,7 +543,7 @@ namespace StructuredLogViewer
         /// </summary>
         private static void CleanupTempFiles()
         {
-            using (SingleGlobalInstance.Acquire("StructuredLogViewerTempFileCleanup"))
+            using (Store.Lock("StructuredLogViewerTempFileCleanup"))
             {
                 if (cleanedUpTempFiles)
                 {

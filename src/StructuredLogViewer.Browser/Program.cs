@@ -11,6 +11,7 @@ namespace StructuredLogViewer.Browser
         private static Task Main(string[] args)
         {
             BrowserApp.Configure();
+            StructuredLogViewer.SettingsService.Store = new BrowserSettingsStore();
             return BuildAvaloniaApp().StartBrowserAppAsync("out");
         }
 

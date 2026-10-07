@@ -61,6 +61,49 @@ namespace StructuredLogViewer.Browser
             return node.ToString();
         }
 
+        /// <summary>Clicks a named button (save, copyFullPath) of the open source file tab, like a user would.</summary>
+        [JSExport]
+        public static async Task<bool> ClickViewerButton(string name)
+        {
+            return await Dispatcher.UIThread.InvokeAsync(() =>
+            {
+                var button = System.Linq.Enumerable.FirstOrDefault(
+                    global::Avalonia.VisualTree.VisualExtensions.GetVisualDescendants(BrowserShell.Instance.BuildControl),
+                    v => v is global::Avalonia.Controls.Button b && b.Name == name && b.IsEffectivelyVisible) as global::Avalonia.Controls.Button;
+                if (button == null)
+                {
+                    return false;
+                }
+
+                button.RaiseEvent(new global::Avalonia.Interactivity.RoutedEventArgs(global::Avalonia.Controls.Button.ClickEvent));
+                return true;
+            });
+        }
+
+        /// <summary>Names of the visible buttons of the open source file tab (to check the desktop-only ones are hidden).</summary>
+        [JSExport]
+        public static string VisibleViewerButtons()
+        {
+            return Dispatcher.UIThread.Invoke(() => string.Join(",", System.Linq.Enumerable.Select(System.Linq.Enumerable.Where(
+                System.Linq.Enumerable.OfType<global::Avalonia.Controls.Button>(global::Avalonia.VisualTree.VisualExtensions.GetVisualDescendants(BrowserShell.Instance.BuildControl)),
+                b => b.IsEffectivelyVisible && !string.IsNullOrEmpty(b.Name)), b => b.Name)));
+        }
+
+        /// <summary>Switches the dark theme through SettingsService (persisted by the settings store).</summary>
+        [JSExport]
+        public static bool SetDarkTheme(bool dark)
+        {
+            return Dispatcher.UIThread.Invoke(() =>
+            {
+                StructuredLogViewer.SettingsService.UseDarkTheme = dark;
+                StructuredLogViewer.Avalonia.App.UpdateTheme();
+                return StructuredLogViewer.SettingsService.UseDarkTheme;
+            });
+        }
+
+        [JSExport]
+        public static bool GetDarkTheme() => StructuredLogViewer.SettingsService.UseDarkTheme;
+
         /// <summary>Opens the first embedded source file whose path contains the filter in the shared text viewer.</summary>
         [JSExport]
         public static async Task<string> OpenFirstSourceFile(string filter)
