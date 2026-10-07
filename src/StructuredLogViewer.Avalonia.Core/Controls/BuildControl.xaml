@@ -1,6 +1,6 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             xmlns:local="clr-namespace:StructuredLogViewer.Avalonia.Controls;assembly=StructuredLogViewer.Avalonia"
+             xmlns:local="clr-namespace:StructuredLogViewer.Avalonia.Controls;assembly=StructuredLogViewer.Avalonia.Core"
              xmlns:structuredLogger="clr-namespace:Microsoft.Build.Logging.StructuredLogger;assembly=StructuredLogger"
              x:Class="StructuredLogViewer.Avalonia.Controls.BuildControl"
              x:DataType="structuredLogger:Build">
@@ -83,10 +83,45 @@
                   </Grid>
                 </TabItem>
 
-                  <!--<TabItem Name="timelineTab"
-                            Header="Timeline">
-                      <local:TimelineControl Name="timeline" />
-                  </TabItem>-->
+                <TabItem Name="timelineTab" Header="Timeline">
+                  <Grid>
+                    <TextBlock Name="timelineWatermark" HorizontalAlignment="Center"
+                               VerticalAlignment="Center">Rendering timeline...</TextBlock>
+                    <local:TimelineControl Name="timeline" IsVisible="False" />
+                  </Grid>
+                </TabItem>
+
+                <TabItem Name="tracingTab" Header="Tracing">
+                  <Grid>
+                    <TextBlock Name="tracingWatermark" HorizontalAlignment="Center"
+                               VerticalAlignment="Center">Rendering tracing...</TextBlock>
+                    <local:TracingControl Name="tracing" IsVisible="False" />
+                  </Grid>
+                </TabItem>
+
+                <TabItem Name="projectReferenceGraphTab" Header="Project References">
+                  <Grid>
+                    <TextBlock HorizontalAlignment="Center" VerticalAlignment="Center">Project reference graph</TextBlock>
+                  </Grid>
+                </TabItem>
+
+                <TabItem Name="targetGraphTab" Header="Targets" IsVisible="False">
+                  <Grid>
+                    <TextBlock HorizontalAlignment="Center" VerticalAlignment="Center">Target graph</TextBlock>
+                  </Grid>
+                </TabItem>
+
+                <TabItem Name="nugetGraphTab" Header="NuGet" IsVisible="False">
+                  <Grid>
+                    <TextBlock HorizontalAlignment="Center" VerticalAlignment="Center">NuGet graph</TextBlock>
+                  </Grid>
+                </TabItem>
+
+                <TabItem Name="propertyGraphTab" Header="Properties" IsVisible="False">
+                  <Grid>
+                    <TextBlock HorizontalAlignment="Center" VerticalAlignment="Center">Property graph</TextBlock>
+                  </Grid>
+                </TabItem>
               </TabControl>
             </local:SplitterPanel.FirstChild>
 

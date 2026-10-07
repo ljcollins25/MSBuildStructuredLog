@@ -29,6 +29,8 @@
                 <MenuItem Name="Open"
                           Header="_Open Log..."
                           InputGesture="Ctrl+O"/>
+                <MenuItem Name="OpenGraph"
+                          Header="Open _Graph..."/>
                 <MenuItem Name="ReloadMenu"
                           Header="_Reload"
                           InputGesture="F5"/>

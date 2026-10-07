@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -23,8 +23,20 @@ public class PreprocessedFileManager
 
     private static string ComputeShortHash(string content)
     {
-        using var md5 = System.Security.Cryptography.MD5.Create();
-        var bytes = md5.ComputeHash(System.Text.Encoding.UTF8.GetBytes(content ?? string.Empty));
+        var input = System.Text.Encoding.UTF8.GetBytes(content ?? string.Empty);
+        byte[] bytes;
+        try
+        {
+            using var md5 = System.Security.Cryptography.MD5.Create();
+            bytes = md5.ComputeHash(input);
+        }
+        catch (Exception)
+        {
+            // MD5 is unavailable in the browser; the hash only names a temp file
+            using var sha = System.Security.Cryptography.SHA256.Create();
+            bytes = sha.ComputeHash(input);
+        }
+
         var sb = new System.Text.StringBuilder(16);
         for (int i = 0; i < 8; i++)
         {

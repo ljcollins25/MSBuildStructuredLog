@@ -25,7 +25,6 @@
       <SubType>Designer</SubType>
     </AvaloniaResource>
     <AvaloniaResource Include="StructuredLogger.ico" />
-    <AvaloniaResource Include="Fonts\*.ttf" />
   </ItemGroup>
 
   <ItemGroup>
@@ -35,20 +34,15 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="Avalonia.AvaloniaEdit" />
     <PackageReference Include="Avalonia.Desktop" />
     <PackageReference Include="AvaloniaUI.DiagnosticsSupport" Condition=" '$(Configuration)' == 'Debug' " />
-    <PackageReference Include="Avalonia.Themes.Fluent" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\StructuredLogger.Utils\StructuredLogger.Utils.csproj" />
     <ProjectReference Include="..\StructuredLogger\StructuredLogger.csproj" />
+    <ProjectReference Include="..\StructuredLogViewer.Avalonia.Core\StructuredLogViewer.Avalonia.Core.csproj" />
     <ProjectReference Include="..\StructuredLogViewer.Core\StructuredLogViewer.Core.csproj" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <EmbeddedResource Include="..\StructuredLogViewer\Resources\SolutionFile.xshd" Link="Resources\SolutionFile.xshd" />
   </ItemGroup>
 
 </Project>

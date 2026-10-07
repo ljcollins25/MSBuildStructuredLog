@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
@@ -142,6 +142,7 @@ namespace StructuredLogViewer.Avalonia.Controls
             this.RegisterControl(out copyFullPath, nameof(copyFullPath));
             this.RegisterControl(out wordWrap, nameof(wordWrap));
             this.RegisterControl(out openInExternalEditor, nameof(openInExternalEditor));
+            openInExternalEditor.IsVisible = PlatformCapabilities.CanLaunchProcesses;
             this.RegisterControl(out copyMenu, nameof(copyMenu));
             this.RegisterControl(out gotoProjectMenu, nameof(gotoProjectMenu));
             this.RegisterControl(out gotoPropertyMenu, nameof(gotoPropertyMenu));
@@ -368,6 +369,13 @@ namespace StructuredLogViewer.Avalonia.Controls
 
         private async void save_Click(object sender, RoutedEventArgs e)
         {
+            if (PlatformCapabilities.SaveTextAsync is { } saveText)
+            {
+                var name = Path.GetFileName(FilePath);
+                await saveText(string.IsNullOrEmpty(name) ? "file.txt" : name, Text);
+                return;
+            }
+
             if (TopLevel.GetTopLevel(this) is not TopLevel topLevel)
             {
                 return;
