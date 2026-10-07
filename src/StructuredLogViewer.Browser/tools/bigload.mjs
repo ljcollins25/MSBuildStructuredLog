@@ -52,6 +52,7 @@ console.log('state', JSON.stringify(state), 'seconds', (Date.now() - t0) / 1000)
 clearInterval(rssTimer);
 const wasmPeak = await page.evaluate(() => { let m = 0; for (const w of globalThis.__mems) { const x = w.deref(); if (x) m = Math.max(m, x.buffer.byteLength); } return Math.max(m, globalThis.__wasmPeak) / 1048576; }).catch(() => -1);
 console.log('RESULT', JSON.stringify({ capMb, timeToFirstTreeSec: tree, wasmMemoryMB: Math.round(wasmPeak), peakRendererRssMB: Math.round(peakRss / 1024) }));
+console.log('SRCSTATS', JSON.stringify(await page.evaluate(() => globalThis.__srcStats).catch(() => null)));
 async function step(name, fn) { const t = Date.now(); try { const r = await page.evaluate(fn); console.log(name, JSON.stringify(r).slice(0, 200), (Date.now() - t) + 'ms'); } catch (e) { console.log(name, 'FAILED', String(e).slice(0, 200)); } }
 if (state.loaded) {
   await step('search CoreCompile', () => globalThis.binlogBrowser.Search('CoreCompile'));
