@@ -39,16 +39,30 @@ namespace StructuredLogViewer.Browser
         public BrowserShell()
         {
             Instance = this;
-            // the desktop MainWindow's menu (the parts that make sense in a browser), nothing else
+            // the desktop MainWindow's menu: what makes sense in a browser (nothing that needs processes or local paths)
+            var fileMenu = new MenuItem { Header = "_File" };
             var startPage = new MenuItem { Header = "Start Page" };
             startPage.Click += (s, e) => ShowWelcome();
             var openLog = new MenuItem { Header = "_Open Log..." };
             openLog.Click += (s, e) => JsInterop.PickFile();
-            var file = new MenuItem { Header = "_File" };
-            file.Items.Add(startPage);
-            file.Items.Add(openLog);
+            reloadMenu = new MenuItem { Header = "_Reload", IsVisible = false };
+            reloadMenu.Click += async (s, e) => { if (lastUrl != null) { await OpenUrlAsync(lastUrl); } };
+            saveAsMenu = new MenuItem { Header = "_Save Log As...", IsVisible = false };
+            saveAsMenu.Click += (s, e) => SaveLogAs();
+            statsMenu = new MenuItem { Header = "_Statistics...", IsVisible = false };
+            statsMenu.Click += (s, e) => ShowStatistics();
+            fileMenu.Items.Add(startPage);
+            fileMenu.Items.Add(openLog);
+            fileMenu.Items.Add(reloadMenu);
+            fileMenu.Items.Add(saveAsMenu);
+            fileMenu.Items.Add(statsMenu);
+            var helpMenu = new MenuItem { Header = "_Help" };
+            helpMenu.Items.Add(HelpLink("Search Syntax", "https://msbuildlog.com/syntax/"));
+            helpMenu.Items.Add(HelpLink("https://github.com/KirillOsenkov/MSBuildStructuredLog", "https://github.com/KirillOsenkov/MSBuildStructuredLog"));
+            helpMenu.Items.Add(HelpLink("https://msbuildlog.com", "https://msbuildlog.com"));
             var menu = new Menu();
-            menu.Items.Add(file);
+            menu.Items.Add(fileMenu);
+            menu.Items.Add(helpMenu);
             var dock = new DockPanel();
             DockPanel.SetDock(menu, Dock.Top);
             dock.Children.Add(menu);
@@ -58,6 +72,59 @@ namespace StructuredLogViewer.Browser
             ShowWelcome();
 
             Dispatcher.UIThread.Post(async () => await StartupAsync(), DispatcherPriority.Background);
+        }
+
+        private MenuItem reloadMenu, saveAsMenu, statsMenu;
+        private byte[] logBytes;
+        private string logName;
+        private string lastUrl;
+
+        public string FileMenuState() =>
+            string.Join(",", new[] { reloadMenu, saveAsMenu, statsMenu }.Where(m => m.IsVisible).Select(m => ((string)m.Header).Replace("_", "").TrimEnd('.')));
+
+        private static MenuItem HelpLink(string header, string url)
+        {
+            var item = new MenuItem { Header = header };
+            item.Click += (s, e) => JsInterop.OpenUrl(url);
+            return item;
+        }
+
+        private void UpdateFileMenu()
+        {
+            bool loaded = buildControl != null;
+            reloadMenu.IsVisible = loaded && lastUrl != null;
+            saveAsMenu.IsVisible = loaded && logBytes != null;
+            statsMenu.IsVisible = loaded && logBytes != null && (logName ?? "").EndsWith(".binlog", StringComparison.OrdinalIgnoreCase);
+        }
+
+        /// <summary>Save Log As: the opened bytes as a download (a binlog is copied losslessly, like the desktop does).</summary>
+        public void SaveLogAs()
+        {
+            if (logBytes != null)
+            {
+                JsInterop.DownloadBytes(logName, logBytes);
+            }
+        }
+
+        /// <summary>Statistics: BinlogStats reads a file, so the bytes go to the in-memory file system first.</summary>
+        public void ShowStatistics()
+        {
+            if (buildControl == null || logBytes == null)
+            {
+                return;
+            }
+
+            string path = Path.Combine(Path.GetTempPath(), Path.GetFileName(logName));
+            File.WriteAllBytes(path, logBytes);
+            try
+            {
+                Document.Build.LogFilePath = path;
+                buildControl.DisplayStats();
+            }
+            finally
+            {
+                File.Delete(path);
+            }
         }
 
         private WelcomeScreen welcome;
@@ -87,6 +154,7 @@ namespace StructuredLogViewer.Browser
             };
 
             content.Content = welcome;
+            UpdateFileMenu();
         }
 
         private async Task StartupAsync()
@@ -104,10 +172,11 @@ namespace StructuredLogViewer.Browser
             try
             {
                 var source = await LogSources.Provider.OpenAsync(url);
+                lastUrl = url;
                 SetStatus($"Downloading {source.Name}" + (source.Length is long n ? $" ({n / 1048576.0:N1} MB)" : "") +
                     (source.SupportsRange ? " with Range requests" : "") + " ...");
                 byte[] bytes = await source.ReadAllAsync(new Progress<double>(p => SetStatus($"Downloading {source.Name}: {p:P0}")));
-                await OpenBytesAsync(source.Name, bytes);
+                await OpenBytesAsync(source.Name, bytes, isUrl: true);
                 return "";
             }
             catch (Exception ex)
@@ -193,7 +262,7 @@ namespace StructuredLogViewer.Browser
                 c => c.IsEffectivelyVisible && (c.Name == "openFromUrl" || c.Name == "openUrlButton" || c.Name == "urlText" || (c is Button b && b.Command == welcome?.OpenProjectCommand))), c => c.Name ?? "openProject")));
         }
 
-        public async Task OpenBytesAsync(string name, byte[] bytes)
+        public async Task OpenBytesAsync(string name, byte[] bytes, bool isUrl = false)
         {
             try
             {
@@ -205,8 +274,16 @@ namespace StructuredLogViewer.Browser
                 double t1 = JsInterop.Now();
 
                 buildControl?.Dispose();
+                logBytes = bytes;
+                logName = name;
+                if (!isUrl)
+                {
+                    lastUrl = null;
+                }
+
                 buildControl = new BuildControl(Document.Build, name);
                 content.Content = buildControl;
+                UpdateFileMenu();
                 SetStatus($"{name}: parsed in {(t1 - t0) / 1000:N1} s, {Document.Files.Count:N0} embedded files, " +
                     (Document.Build.Succeeded ? "succeeded" : "failed"));
                 JsInterop.Report($"Parsed {name} in {t1 - t0:N0} ms; files {Document.Files.Count}; heap {GC.GetTotalMemory(false) / 1048576} MB");

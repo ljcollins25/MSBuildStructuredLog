@@ -66,3 +66,20 @@ export function downloadText(name, text) {
 export function prefersDark() {
     return !!globalThis.matchMedia?.('(prefers-color-scheme: dark)').matches;
 }
+
+// Save Log As: a plain browser download of the bytes
+export function downloadBytes(name, bytes) {
+    const url = URL.createObjectURL(new Blob([bytes], { type: 'application/octet-stream' }));
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = name;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 10000);
+    globalThis.binlogLastDownload = { name, length: bytes.length };
+}
+
+export function openUrl(url) {
+    globalThis.open(url, '_blank', 'noopener');
+}

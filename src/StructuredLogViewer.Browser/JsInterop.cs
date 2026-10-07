@@ -28,6 +28,12 @@ namespace StructuredLogViewer.Browser
         [JSImport("downloadText", Module)]
         public static partial void DownloadText(string name, string text);
 
+        [JSImport("downloadBytes", Module)]
+        public static partial void DownloadBytes(string name, byte[] bytes);
+
+        [JSImport("openUrl", Module)]
+        public static partial void OpenUrl(string url);
+
         [JSImport("prefersDark", Module)]
         public static partial bool PrefersDark();
 

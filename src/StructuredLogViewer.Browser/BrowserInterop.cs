@@ -183,6 +183,16 @@ namespace StructuredLogViewer.Browser
         [JSExport]
         public static string GetDarkThemeCheckBoxCenter() => Dispatcher.UIThread.Invoke(() => BrowserShell.Instance.DarkThemeCheckBoxCenter());
 
+        /// <summary>Visible File menu commands, e.g. "Reload,Save Log As,Statistics" (for the e2e).</summary>
+        [JSExport]
+        public static string GetFileMenu() => Dispatcher.UIThread.Invoke(() => BrowserShell.Instance.FileMenuState());
+
+        [JSExport]
+        public static void SaveLogAs() => Dispatcher.UIThread.Invoke(() => BrowserShell.Instance.SaveLogAs());
+
+        [JSExport]
+        public static string ShowStatistics() => Dispatcher.UIThread.Invoke(() => { BrowserShell.Instance.ShowStatistics(); return BrowserShell.Instance.BuildControl?.Build.FindChild<Folder>(static f => f.Name.StartsWith(Strings.Statistics))?.Name ?? ""; });
+
         [JSExport]
         public static string GetThemeInfo() => Dispatcher.UIThread.Invoke(() => BrowserShell.Instance.ThemeInfo());
 

@@ -234,6 +234,13 @@ try {
     await v.until(s => s.status !== undefined, 'the app to restart', 120000);
     check(await v.page.evaluate(() => globalThis.binlogBrowser.GetDarkTheme()), 'dark theme restored after reload');
     await v.page.evaluate(() => globalThis.binlogBrowser.SetDarkTheme(false));
+    // File menu with a dropped (local) log: no Reload (nothing to re-fetch); Save Log As and Statistics work
+    check(await v.page.evaluate(() => globalThis.binlogBrowser.GetFileMenu()) === 'Save Log As,Statistics', 'File menu for a dropped log: ' + await v.page.evaluate(() => globalThis.binlogBrowser.GetFileMenu()));
+    await v.page.evaluate(() => globalThis.binlogBrowser.SaveLogAs());
+    const saved = await v.page.evaluate(() => globalThis.binlogLastDownload);
+    check(saved?.name === 'fixture.binlog' && saved.length === metrics.binlogBytes, 'Save Log As downloads the original bytes: ' + JSON.stringify(saved));
+    const statsName = await v.page.evaluate(() => globalThis.binlogBrowser.ShowStatistics());
+    check(/Statistics/.test(statsName), 'Statistics adds the Statistics node: ' + statsName);
     check(v.errors.length === 0, 'no console errors (drop)' + (v.errors.length ? ': ' + v.errors.slice(0, 3).join(' | ') : ''));
     check(v.failed.length === 0, 'no failed requests (drop)' + (v.failed.length ? ': ' + v.failed.slice(0, 3).join(' | ') : ''));
     await v.page.close();
@@ -243,6 +250,7 @@ try {
     const s2 = await w.until(s => s.loaded, 'the ?url= binlog to load');
     metrics.urlWarmToTreeMs = Date.now() - w.t0;
     check(s2.loaded, '?url= opens the binlog: ' + s2.status);
+    check(await w.page.evaluate(() => globalThis.binlogBrowser.GetFileMenu()) === 'Reload,Save Log As,Statistics', 'File menu for a log from a URL has Reload: ' + await w.page.evaluate(() => globalThis.binlogBrowser.GetFileMenu()));
     check(w.errors.length === 0, 'no console errors (?url=)' + (w.errors.length ? ': ' + w.errors.slice(0, 3).join(' | ') : ''));
     await w.page.close();
 
