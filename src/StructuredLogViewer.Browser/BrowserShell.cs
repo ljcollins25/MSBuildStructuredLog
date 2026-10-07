@@ -172,7 +172,9 @@ namespace StructuredLogViewer.Browser
                 background = brush.Color.ToString();
             }
 
-            return variant + "|" + background + "|" + (Background as ISolidColorBrush)?.Color;
+            var box = global::Avalonia.VisualTree.VisualExtensions.GetVisualDescendants(this).OfType<CheckBox>()
+                .FirstOrDefault(c => (c.Content as string) == "Dark Theme");
+            return variant + "|" + background + "|" + (box == null ? "nobox" : box.IsChecked == true ? "checked" : "unchecked");
         }
 
         public string WelcomeControlsVisible()

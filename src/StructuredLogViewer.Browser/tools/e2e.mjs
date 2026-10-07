@@ -95,6 +95,7 @@ try {
     await u.page.waitForTimeout(500);
     const dark = await info(u.page);
     check(dark[0] === 'Dark' && dark[1] !== light[1], 'ticking Dark Theme switches live, without a reload: ' + dark.join('|') + ' (was ' + light[1] + ')');
+    check(dark[2] === 'checked', 'the checkbox shows ticked: ' + dark[2]);
     await u.page.screenshot({ path: path.join(path.dirname(path.resolve(opt.metrics || 'metrics.json')), 'e2e-0c-start-dark.png') });
     check(/UseDarkTheme=True/.test(await u.page.evaluate(() => localStorage.getItem('binlog:Settings.txt')) || ''), 'the choice is saved');
     await u.page.reload();
