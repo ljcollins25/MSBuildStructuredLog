@@ -11,6 +11,12 @@ export function now() {
 }
 
 export function report(message) {
+    // set by tools/bigload.mjs: the wasm memory size next to the managed heap shows the overhead of the GC and the native side
+    const mem = globalThis.__mems?.[0]?.deref();
+    if (mem) {
+        message += ` wasm ${mem.buffer.byteLength / 1048576 | 0} MB`;
+    }
+
     console.log(message);
     document.title = message;
 }
