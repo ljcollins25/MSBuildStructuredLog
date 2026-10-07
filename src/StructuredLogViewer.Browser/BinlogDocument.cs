@@ -38,13 +38,20 @@ namespace StructuredLogViewer.Browser
                 progress.Updated += update => progressCallback(update.Ratio);
             }
 
+            var sw = System.Diagnostics.Stopwatch.StartNew();
+            var gc0 = GC.CollectionCount(0); var gc2 = GC.CollectionCount(2);
             var build = BinaryLog.ReadBuild(stream, progress, projectImportsArchive: null);
+            var readMs = sw.ElapsedMilliseconds;
+            Console.WriteLine("Parsed phase ReadBuild ms=" + readMs + " gc0=" + (GC.CollectionCount(0) - gc0) + " gc2=" + (GC.CollectionCount(2) - gc2) + " pauseMs=" + (long)GC.GetTotalPauseDuration().TotalMilliseconds + " heapMB=" + GC.GetTotalMemory(false) / 1048576);
 
             // same post-processing as the desktop viewer: project reference and target graphs, secrets and NuGet search
             BuildAnalyzer.AnalyzeBuild(build);
+            var analyzeMs = sw.ElapsedMilliseconds - readMs;
             build.SearchExtensions.Add(new SecretsSearch(build));
             build.SearchExtensions.Add(new NuGetSearch(build));
-            return new BinlogDocument(build).Initialize();
+            var doc = new BinlogDocument(build).Initialize();
+            Console.WriteLine("Parsed phase Analyze ms=" + analyzeMs + " init ms=" + (sw.ElapsedMilliseconds - readMs - analyzeMs));
+            return doc;
         }
 
         private BinlogDocument Initialize()

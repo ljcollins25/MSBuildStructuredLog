@@ -102,10 +102,15 @@ export function readSource(id, position, count) {
     xhr.open('GET', s.url, false);
     xhr.setRequestHeader('Range', 'bytes=' + position + '-' + (position + count - 1));
     xhr.overrideMimeType('text/plain; charset=x-user-defined');
+    const t0 = performance.now();
     xhr.send();
+    const t1 = performance.now();
     const t = xhr.responseText;
     const bytes = new Uint8Array(t.length);
     for (let i = 0; i < t.length; i++) bytes[i] = t.charCodeAt(i) & 0xff;
+    const t2 = performance.now();
+    const st = globalThis.__srcStats ??= { n: 0, bytes: 0, xhrMs: 0, convMs: 0 };
+    st.n++; st.bytes += bytes.length; st.xhrMs += t1 - t0; st.convMs += t2 - t1;
     return bytes;
 }
 
