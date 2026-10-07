@@ -181,6 +181,9 @@ namespace StructuredLogViewer.Browser
 
         /// <summary>The resolved theme variant and background color, to see a live switch without a screenshot.</summary>
         [JSExport]
+        public static string GetDarkThemeCheckBoxCenter() => Dispatcher.UIThread.Invoke(() => BrowserShell.Instance.DarkThemeCheckBoxCenter());
+
+        [JSExport]
         public static string GetThemeInfo() => Dispatcher.UIThread.Invoke(() => BrowserShell.Instance.ThemeInfo());
 
         [JSExport]

@@ -91,7 +91,10 @@ try {
     const info = async pg => (await pg.evaluate(() => globalThis.binlogBrowser.GetThemeInfo())).split('|');
     const light = await info(u.page);
     check(light[0] === 'Light', 'light theme by default (prefers light): ' + light.join('|'));
-    check(await u.page.evaluate(() => globalThis.binlogBrowser.TickDarkThemeCheckBox(true)), 'Dark Theme checkbox is on the start page');
+    const center = await u.page.evaluate(() => globalThis.binlogBrowser.GetDarkThemeCheckBoxCenter());
+    check(center !== '', 'Dark Theme checkbox is on the start page: ' + center);
+    const [cx, cy] = center.split(',').map(Number);
+    await u.page.mouse.click(cx, cy); // a real click, like the user
     await u.page.waitForTimeout(500);
     const dark = await info(u.page);
     check(dark[0] === 'Dark' && dark[1] !== light[1], 'ticking Dark Theme switches live, without a reload: ' + dark.join('|') + ' (was ' + light[1] + ')');

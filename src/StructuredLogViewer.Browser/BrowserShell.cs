@@ -163,6 +163,15 @@ namespace StructuredLogViewer.Browser
             return true;
         }
 
+        /// <summary>Center of the Dark Theme checkbox in page pixels ("x,y"), so a test can click it for real; "" when not shown.</summary>
+        public string DarkThemeCheckBoxCenter()
+        {
+            var box = global::Avalonia.VisualTree.VisualExtensions.GetVisualDescendants(this).OfType<CheckBox>()
+                .FirstOrDefault(c => c.IsEffectivelyVisible && (c.Content as string) == "Dark Theme");
+            var p = box?.TranslatePoint(new Point(10, box.Bounds.Height / 2), this);
+            return p == null ? "" : $"{p.Value.X:0},{p.Value.Y:0}";
+        }
+
         public string ThemeInfo()
         {
             var variant = Application.Current.ActualThemeVariant;
