@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Text;
@@ -343,6 +343,16 @@ namespace Microsoft.Build.Logging.StructuredLogger
 
         private void AddItems(IEnumerable items, TreeNode parent)
         {
+            if (items is IList<ITaskItem> taskItems && taskItems.Count > 0)
+            {
+                // keep the item records, the Item nodes and their metadata are created when the children are requested
+                var records = new List<ITaskItem>(taskItems);
+                if (parent.TrySetLazyChildren(new LazyItems(records, construction.AddMetadata)))
+                {
+                    return;
+                }
+            }
+
             construction.Build.RunInBackground(() => AddItemsCore(items, parent));
         }
 

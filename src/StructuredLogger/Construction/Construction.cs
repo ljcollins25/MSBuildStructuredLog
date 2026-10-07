@@ -1351,14 +1351,14 @@ namespace Microsoft.Build.Logging.StructuredLogger
             string targetFrameworks = null;
             string targetFrameworkVersion = null;
 
-            if (properties is ArrayDictionary<string, string> array && array.Count > 0 && !parent.HasChildren)
+            if (properties is ArrayDictionary<string, string> array && array.Count > 0)
             {
                 // keep the properties as the arrays of the dictionary, the Property nodes are only
                 // created when the children of the parent are requested
                 var keys = array.KeyArray;
                 var vals = array.ValueArray;
                 int n = array.Count;
-                if (parent.TrySetLazyChildren(new LazyNameValues<Property>(keys, vals, n)))
+                if (parent.TrySetLazyChildrenAfterExisting(new LazyNameValues<Property>(keys, vals, n)))
                 {
                     if (project != null)
                     {

@@ -88,6 +88,27 @@ namespace Microsoft.Build.Logging.StructuredLogger
             return true;
         }
 
+        /// <summary>
+        /// Like <see cref="TrySetLazyChildren"/>, but a node that already has (real) children keeps them in front
+        /// of the lazily created ones. Returns false, and does nothing, when the children are lazy already.
+        /// </summary>
+        internal bool TrySetLazyChildrenAfterExisting(LazyChildren lazy)
+        {
+            if (children == null)
+            {
+                children = lazy;
+                return true;
+            }
+
+            if (children is LazyChildren)
+            {
+                return false;
+            }
+
+            children = new LazyAfterExisting(children, lazy);
+            return true;
+        }
+
         protected ChildrenList CreateChildrenList()
         {
             if (DisableChildrenCache)

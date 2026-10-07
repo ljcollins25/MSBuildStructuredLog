@@ -108,4 +108,36 @@ namespace Microsoft.Build.Logging.StructuredLogger
             return list;
         }
     }
+
+    /// <summary>The children a node already has, followed by lazily created ones.</summary>
+    internal sealed class LazyAfterExisting : LazyChildren
+    {
+        private readonly IList<BaseNode> existing;
+        private readonly LazyChildren lazy;
+
+        public LazyAfterExisting(IList<BaseNode> existing, LazyChildren lazy)
+        {
+            this.existing = existing;
+            this.lazy = lazy;
+        }
+
+        public override int Count => existing.Count + lazy.Count;
+
+        public override IList<BaseNode> Create(TreeNode parent)
+        {
+            var created = lazy.Create(parent);
+            var list = new ChildrenList(existing.Count + created.Count);
+            foreach (var node in existing)
+            {
+                list.Add(node);
+            }
+
+            foreach (var node in created)
+            {
+                list.Add(node);
+            }
+
+            return list;
+        }
+    }
 }
