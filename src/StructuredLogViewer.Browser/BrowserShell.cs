@@ -50,7 +50,6 @@ namespace StructuredLogViewer.Browser
             dock.Children.Add(content);
             Content = dock;
             // the desktop MainWindow's Ctrl+F / Ctrl+Shift+F; Ctrl+0 and Ctrl+wheel stay the browser's own page zoom
-            AddHandler(KeyDownEvent, OnShortcut, RoutingStrategies.Tunnel);
             status.Text = "Open a .binlog (button, drag and drop, URL, or ?url=...).";
             ShowWelcome();
 
@@ -101,6 +100,13 @@ namespace StructuredLogViewer.Browser
 
                 return message;
             }
+        }
+
+        protected override void OnAttachedToVisualTree(VisualTreeAttachmentEventArgs e)
+        {
+            base.OnAttachedToVisualTree(e);
+            // on the TopLevel: with nothing focused, key events never pass through this control
+            TopLevel.GetTopLevel(this)?.AddHandler(KeyDownEvent, OnShortcut, RoutingStrategies.Tunnel);
         }
 
         private void OnShortcut(object sender, KeyEventArgs e)

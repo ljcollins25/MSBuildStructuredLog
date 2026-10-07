@@ -111,7 +111,7 @@ try {
 
     // ---- drag and drop ----
     const v = await visit(context, url);
-    await v.until(s => s.status !== undefined, 'the app to start', 120000);
+    await v.until(s => !!s.status, 'the app to start', 120000);
     metrics.startMs = Date.now() - v.t0;
     const b64 = fs.readFileSync(binlog).toString('base64');
     const t1 = Date.now();
@@ -135,7 +135,7 @@ try {
     await v.page.keyboard.press('Control+Shift+F');
     await v.page.waitForTimeout(500);
     s = await v.state();
-    check(s.leftTab === 'findInFilesTab', 'Ctrl+Shift+F opens Find in Files: ' + s.leftTab);
+    check(s.leftTab === 'findInFilesTab', 'Ctrl+Shift+F opens Find in Files: ' + s.leftTab + ' (tab available: ' + s.findInFiles + ')');
     await v.page.keyboard.press('Control+F');
     await v.page.waitForTimeout(300);
     await shot('e2e-1b-shortcut.png');

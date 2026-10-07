@@ -2481,6 +2481,8 @@ Recent ("));
         /// <summary>Name of the selected tab of the left pane (searchLogTab, findInFilesTab, ...), for tests.</summary>
         public string SelectedLeftTabName => (leftPaneTabControl.SelectedItem as TabItem)?.Name;
 
+        public bool IsFindInFilesAvailable => findInFilesTab.IsVisible;
+
         public void FocusSearch()
         {
             if (leftPaneTabControl.SelectedItem == searchLogTab)
