@@ -4,7 +4,7 @@ The MSBuild Structured Log Viewer (Avalonia) running in the browser on .NET WebA
 
 **Big logs do not fit yet.** The page says so. The wasm32 heap runs out above roughly 50 MB on disk (about 200 MB decompressed); a 79 MB dotnet/runtime log fails at about 60% (see docs/wasm/measurements.md).
 
-- **Fork / ref to pin:** `ljcollins25/MSBuildStructuredLog`, branch `wasm`, at the commit you choose (put the sha here when you pin it; bump it deliberately).
+- **Fork / ref to pin:** `ljcollins25/MSBuildStructuredLog`, branch `wasm`, at the commit you choose (put the sha here when you pin it; bump it deliberately). Pin a commit at or after the shared-UI restructure: the page now runs the real `StructuredLogViewer.Avalonia.Core` viewer (same BuildControl as the desktop app), not a separate hand-written UI. Screenshots: `docs/wasm/shared-ui-*.png`.
 - **Build command** (ubuntu-latest, .NET 10 SDK, node 22; no workload):
   `src/StructuredLogViewer.Browser/build-static.sh <outdir> --target=pages` (or `--target=cloudflare`)
 - **Output folder:** `<outdir>`: the site root (`index.html`, `staging.json`, hashed `main.*.js`, `_framework/`, `vendor/`). Copy its *contents* to `_site/binlog/`. About 20 MiB on disk for Pages.

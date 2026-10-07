@@ -27,7 +27,7 @@ namespace StructuredLogViewer.Browser
             return "{\"loaded\":true,\"status\":\"" + Esc(BrowserShell.Instance.StatusText) + "\",\"succeeded\":" + (doc.Build.Succeeded ? "true" : "false") +
                 ",\"files\":" + doc.Files.Count +
                 ",\"searchText\":\"" + Esc(bc.SearchText) + "\"" +
-                ",\"selected\":\"" + Esc((bc.searchLogControl.ResultsList.SelectedItem as SearchResult)?.Node?.ToString()) + "\"" +
+                ",\"selected\":\"" + Esc(bc.SelectedTreeViewItem?.DataContext?.ToString()) + "\"" +
                 ",\"searchResults\":" + bc.searchLogControl.ResultsList.ItemCount + "}";
         }
 
@@ -41,13 +41,24 @@ namespace StructuredLogViewer.Browser
             return await Dispatcher.UIThread.InvokeAsync(() =>
             {
                 var list = bc.searchLogControl.ResultsList;
-                if (list.ItemCount > 0)
-                {
-                    list.SelectedItem = System.Linq.Enumerable.FirstOrDefault(System.Linq.Enumerable.Cast<object>(list.Items));
-                }
-
                 return list.ItemCount;
             });
+        }
+
+        /// <summary>Selects the first Task whose name contains the text, like clicking it in the tree (details, breadcrumb).</summary>
+        [JSExport]
+        public static async Task<string> SelectFirstTask(string name)
+        {
+            var shell = BrowserShell.Instance;
+            var node = shell.Document.Build.FindFirstDescendant<Microsoft.Build.Logging.StructuredLogger.Task>(t => t.Name != null && t.Name.Contains(name));
+            if (node == null)
+            {
+                return "";
+            }
+
+            await Dispatcher.UIThread.InvokeAsync(() => shell.BuildControl.SelectItem(node));
+            await Task.Delay(500);
+            return node.ToString();
         }
 
         /// <summary>Opens the first embedded source file whose path contains the filter in the shared text viewer.</summary>

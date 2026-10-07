@@ -81,7 +81,9 @@ try {
     const results = await v.page.evaluate(q => globalThis.binlogBrowser.Search(q), targetText);
     check(results > 0, `search for '${targetText}' returns results (${results})`);
     s = await v.state();
-    check(s.searchText === targetText && s.selected, 'the first hit is selected: ' + (s.selected ?? '').slice(0, 60));
+    const picked = await v.page.evaluate(() => globalThis.binlogBrowser.SelectFirstTask('Csc'));
+    s = await v.state();
+    check(!!picked && s.selected === picked, 'selecting a task shows it in the main tree: ' + picked);
     await v.page.waitForTimeout(500);
     await shot('e2e-2-search-and-details.png');
 
