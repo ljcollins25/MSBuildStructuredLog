@@ -115,6 +115,7 @@ namespace StructuredLogViewer.Avalonia.Controls
         private TextBlock timelineWatermark;
         private TimelineControl timeline;
         private MenuItem goToTimeLineItem;
+        private MenuItem gotoMenuGroup;
         private ListBox breadCrumb;
         private TabControl leftPaneTabControl;
         private TabItem searchLogTab;
@@ -302,7 +303,8 @@ namespace StructuredLogViewer.Avalonia.Controls
             searchThisNode = new MenuItem() { Header = "Search this node" };
             excludeSubtreeFromSearchItem = new MenuItem() { Header = "Exclude subtree from search" };
             excludeNodeByNameFromSearch = new MenuItem() { Header = "Exclude node from search" };
-            goToTimeLineItem = new MenuItem() { Header = "Go to Timeline" };
+            gotoMenuGroup = new MenuItem() { Header = "Go to" };
+            goToTimeLineItem = new MenuItem() { Header = "Timeline" };
             goToTimeLineItem.Click += (s, a) => GoToTimeLine();
             searchInclusiveWithinThisTimespan = new MenuItem() { Header = "Search overlapping this duration" };
             searchExclusiveWithinThisTimespan = new MenuItem() { Header = "Search within this duration" };
@@ -375,7 +377,8 @@ namespace StructuredLogViewer.Avalonia.Controls
 
             contextMenu.AddItem(viewSubtreeTextItem);
             contextMenu.AddItem(showTimeItem);
-            contextMenu.AddItem(goToTimeLineItem);
+            contextMenu.AddItem(gotoMenuGroup);
+            gotoMenuGroup.AddItem(goToTimeLineItem);
 
             contextMenu.AddItem(separator1);
 
@@ -769,6 +772,7 @@ Right-clicking a project node may show the 'Preprocess' option if the version of
             excludeNodeByNameFromSearch = null;
             searchInclusiveWithinThisTimespan = null;
             goToTimeLineItem = null;
+            gotoMenuGroup = null;
             searchExclusiveWithinThisTimespan = null;
             copyChildrenItem = null;
             sortChildrenByNameItem = null;
@@ -1409,6 +1413,8 @@ Recent ("));
             }
 
             searchMenuGroup.IsVisible = searchMenuGroup.Items.OfType<MenuItem>().Any(p => p.IsVisible);
+        
+            gotoMenuGroup.IsVisible = gotoMenuGroup.Items.OfType<MenuItem>().Any(m => m.IsVisible);
         }
 
         private void SharedTreeContextMenu_Opened(object sender, RoutedEventArgs e)
