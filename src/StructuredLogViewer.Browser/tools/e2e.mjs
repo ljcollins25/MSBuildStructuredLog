@@ -95,6 +95,7 @@ try {
 
     // ---- tracing and graph views (shared controls) ----
     const tg = await v.page.evaluate(() => globalThis.binlogBrowser.GoToTracingAndGraphs('Csc'));
+    console.log('graph hook: ' + tg);
     const [tracingBlocks, refVerts, targetVerts, propVerts] = tg.split('|').map(Number);
     check(tracingBlocks > 0, 'tracing renders blocks: ' + tg);
     check(refVerts > 0, 'project reference graph renders');

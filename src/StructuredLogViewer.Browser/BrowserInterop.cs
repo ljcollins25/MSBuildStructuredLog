@@ -123,21 +123,28 @@ namespace StructuredLogViewer.Browser
             }
 
             string result = null;
+            string Step(string name, System.Func<object> action)
+            {
+                try { return action()?.ToString(); }
+                catch (System.Exception ex) { return name + " failed: " + ex.GetType().Name + " " + ex.Message + " @ " + (ex.StackTrace ?? "").Split('\n')[0].Trim(); }
+            }
+
+            var errors = "";
             await Dispatcher.UIThread.InvokeAsync(() =>
             {
                 var bc = shell.BuildControl;
-                bc.SelectItem(node);
-                bc.GoToTracing();
+                errors += Step("select", () => { bc.SelectItem(node); return ""; });
+                errors += Step("goToTracing", () => { bc.GoToTracing(); return ""; });
             });
             await Task.Delay(1500);
             await Dispatcher.UIThread.InvokeAsync(() =>
             {
                 var bc = shell.BuildControl;
-                int tracing = bc.TracingControl.BlockCount;
-                int refs = bc.ProjectReferenceGraphHost?.GraphControl.DisplayedCount ?? -1;
-                int targets = bc.ShowTargetGraph(project)?.GraphControl.DisplayedCount ?? -1;
-                int props = bc.ShowPropertyGraph(project)?.GraphControl.DisplayedCount ?? -1;
-                result = $"{tracing}|{refs}|{targets}|{props}";
+                string tracing = Step("tracing", () => bc.TracingControl.BlockCount);
+                string refs = Step("refs", () => bc.ProjectReferenceGraphHost?.GraphControl.DisplayedCount ?? -1);
+                string targets = Step("targets", () => bc.ShowTargetGraph(project)?.GraphControl.DisplayedCount ?? -1);
+                string props = Step("props", () => bc.ShowPropertyGraph(project)?.GraphControl.DisplayedCount ?? -1);
+                result = $"{tracing}|{refs}|{targets}|{props}|{errors}";
             });
             await Task.Delay(500);
             return result;
