@@ -1,6 +1,14 @@
 using System.Runtime.InteropServices.JavaScript;
 using System.Threading.Tasks;
+using System;
+using System.Diagnostics;
+using System.Linq;
+using Avalonia;
+using Avalonia.Controls;
+using Avalonia.Input;
 using Avalonia.Threading;
+using Avalonia.VisualTree;
+using StructuredLogViewer.Avalonia.Controls;
 using Microsoft.Build.Logging.StructuredLogger;
 using Task = System.Threading.Tasks.Task;
 
@@ -35,7 +43,7 @@ namespace StructuredLogViewer.Browser
             return "{\"loaded\":true,\"status\":\"" + Esc(BrowserShell.Instance.StatusText) + "\",\"succeeded\":" + (doc.Build.Succeeded ? "true" : "false") +
                 ",\"files\":" + doc.Files.Count +
                 ",\"searchText\":\"" + Esc(bc.SearchText) + "\"" +
-                ",\"selected\":\"" + Esc(bc.SelectedTreeViewItem?.DataContext?.ToString()) + "\"" +
+                ",\"selected\":\"" + Esc((bc.SelectedMainNode ?? bc.SelectedTreeViewItem?.DataContext)?.ToString()) + "\"" +
                 ",\"searchResults\":" + bc.searchLogControl.ResultsList.ItemCount +
                 ",\"leftTab\":\"" + Esc(bc.SelectedLeftTabName) + "\",\"findInFiles\":" + (bc.IsFindInFilesAvailable ? "true" : "false") + "}";
         }
@@ -198,6 +206,126 @@ namespace StructuredLogViewer.Browser
 
         [JSExport]
         public static bool GetDarkTheme() => StructuredLogViewer.SettingsService.UseDarkTheme;
+
+        // ---- flat virtualized tree test hooks ----
+
+        [JSExport]
+        public static bool SetVirtualizedTree(bool on) { StructuredLogViewer.SettingsService.VirtualizedTree = on; return StructuredLogViewer.SettingsService.VirtualizedTree; }
+
+        private static FlatTreeView Flat => BrowserShell.Instance?.BuildControl?.MainTreeControl as FlatTreeView;
+
+        private static ListBoxItem RealizedItem(FlatTreeView tree, BaseNode node) =>
+            tree.GetVisualDescendants().OfType<ListBoxItem>().FirstOrDefault(i => (i.DataContext as FlatRow)?.Node == node);
+
+        private static bool InViewport(FlatTreeView tree, ListBoxItem item)
+        {
+            var p = item?.TranslatePoint(new Point(0, 0), tree);
+            return p != null && p.Value.Y >= 0 && p.Value.Y + item.Bounds.Height <= tree.Bounds.Height + 1;
+        }
+
+        /// <summary>"flat|rows|realized" of the main tree.</summary>
+        [JSExport]
+        public static string TreeInfo() => Dispatcher.UIThread.Invoke(() =>
+        {
+            var t = Flat;
+            return t == null ? "treeview" : "flat|" + t.RowCount + "|" + t.GetVisualDescendants().OfType<ListBoxItem>().Count();
+        });
+
+        /// <summary>Selects the last node (deepest in document order) matching a task name, expanding its ancestors. Returns "selectedOk|realized|inViewport|rowIndex".</summary>
+        [JSExport]
+        public static async Task<string> GoToDeepTask(string name)
+        {
+            var shell = BrowserShell.Instance;
+            Microsoft.Build.Logging.StructuredLogger.Task node = null;
+            shell.Document.Build.VisitAllChildren<Microsoft.Build.Logging.StructuredLogger.Task>(t => { if (t.Name != null && t.Name.Contains(name)) node = t; });
+            if (node == null) return "none";
+            await Dispatcher.UIThread.InvokeAsync(() => shell.BuildControl.SelectItem(node));
+            await Task.Delay(800);
+            return Dispatcher.UIThread.Invoke(() =>
+            {
+                var t = Flat;
+                var item = RealizedItem(t, node);
+                return (t.SelectedNode == node) + "|" + (item != null) + "|" + InViewport(t, item) + "|" + t.IndexOfNode(node);
+            });
+        }
+
+        /// <summary>Window coordinates "x,y" of the realized row of the selected node (or the first row when asked), for real pointer input.</summary>
+        [JSExport]
+        public static string SelectedRowCenter() => Dispatcher.UIThread.Invoke(() =>
+        {
+            var t = Flat;
+            var item = RealizedItem(t, t.SelectedNode);
+            var p = item?.TranslatePoint(new Point(120, item.Bounds.Height / 2), BrowserShell.Instance);
+            return p == null ? "" : $"{p.Value.X:0},{p.Value.Y:0}";
+        });
+
+        /// <summary>Selected node text and whether the context menu is open.</summary>
+        [JSExport]
+        public static string SelectionAndMenu() => Dispatcher.UIThread.Invoke(() =>
+        {
+            var t = Flat;
+            return (t.SelectedNode?.ToString() ?? "") + "|" + (t.ContextMenu?.IsOpen == true) + "|" + (t.ContextMenu?.Items.Count ?? 0);
+        });
+
+        /// <summary>Selects the first row, then moves Down n times with real key events; reports "indexBefore|indexAfter|inViewport|realized".</summary>
+        [JSExport]
+        public static async Task<string> KeyboardDown(int count)
+        {
+            Dispatcher.UIThread.Invoke(() =>
+            {
+                var t = Flat;
+                t.SelectedItem = t.Items.Cast<object>().First();
+                t.Focus();
+            });
+            await Task.Delay(300);
+            int before = Dispatcher.UIThread.Invoke(() => Flat.SelectedIndex);
+            for (int i = 0; i < count; i++)
+            {
+                Dispatcher.UIThread.Invoke(() =>
+                {
+                    var t = Flat;
+                    var focused = TopLevel.GetTopLevel(t)?.FocusManager?.GetFocusedElement() as Control ?? t;
+                    focused.RaiseEvent(new KeyEventArgs { RoutedEvent = InputElement.KeyDownEvent, Key = Key.Down, Source = focused });
+                });
+                if (i % 10 == 0) await Task.Delay(30);
+            }
+
+            await Task.Delay(600);
+            return Dispatcher.UIThread.Invoke(() =>
+            {
+                var t = Flat;
+                var item = RealizedItem(t, t.SelectedNode);
+                return before + "|" + t.SelectedIndex + "|" + InViewport(t, item) + "|" + t.GetVisualDescendants().OfType<ListBoxItem>().Count();
+            });
+        }
+
+        /// <summary>Expands the node with the most children, collapses and re-expands: "children|rows|realized|expandMs|rowsAfterCollapse|reexpandMs".</summary>
+        [JSExport]
+        public static async Task<string> BigNodeToggle()
+        {
+            var shell = BrowserShell.Instance;
+            TreeNode big = null;
+            shell.Document.Build.VisitAllChildren<TreeNode>(n => { if (big == null || n.Children.Count > big.Children.Count) big = n; });
+            var t = Flat;
+            var sw = Stopwatch.StartNew();
+            await Dispatcher.UIThread.InvokeAsync(() => shell.BuildControl.SelectItem(big));
+            await Dispatcher.UIThread.InvokeAsync(() => big.IsExpanded = false);
+            await Task.Delay(300);
+            int collapsedRows = Dispatcher.UIThread.Invoke(() => t.RowCount);
+            sw.Restart();
+            await Dispatcher.UIThread.InvokeAsync(() => big.IsExpanded = true);
+            await Dispatcher.UIThread.InvokeAsync(() => { }, DispatcherPriority.Background);
+            long expandMs = sw.ElapsedMilliseconds;
+            await Task.Delay(300);
+            var (rows, realized) = Dispatcher.UIThread.Invoke(() => (t.RowCount, t.GetVisualDescendants().OfType<ListBoxItem>().Count()));
+            await Dispatcher.UIThread.InvokeAsync(() => big.IsExpanded = false);
+            await Task.Delay(300);
+            int after = Dispatcher.UIThread.Invoke(() => t.RowCount);
+            sw.Restart();
+            await Dispatcher.UIThread.InvokeAsync(() => big.IsExpanded = true);
+            await Dispatcher.UIThread.InvokeAsync(() => { }, DispatcherPriority.Background);
+            return big.Children.Count + "|" + rows + "|" + realized + "|" + expandMs + "|" + (after == collapsedRows) + "|" + sw.ElapsedMilliseconds;
+        }
 
         /// <summary>Opens the first embedded source file whose path contains the filter in the shared text viewer.</summary>
         [JSExport]

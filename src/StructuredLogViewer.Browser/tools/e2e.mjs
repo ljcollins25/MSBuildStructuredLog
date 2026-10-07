@@ -245,6 +245,74 @@ try {
     check(v.failed.length === 0, 'no failed requests (drop)' + (v.failed.length ? ': ' + v.failed.slice(0, 3).join(' | ') : ''));
     await v.page.close();
 
+    // ---- flat virtualized tree (setting on) ----
+    async function flatPage(file, label) {
+        const ctx = await browser.newContext();
+        const p = await visit(ctx, url);
+        await p.until(st => !!st.status, 'the app to start (' + label + ')', 120000);
+        const b = fs.readFileSync(file).toString('base64');
+        const t = Date.now();
+        await p.page.evaluate(async b64 => {
+            const bytes = Uint8Array.from(atob(b64), c => c.charCodeAt(0));
+            const dt = new DataTransfer();
+            dt.items.add(new File([bytes], 'flat.binlog', { type: 'application/octet-stream' }));
+            document.dispatchEvent(new DragEvent('drop', { dataTransfer: dt, bubbles: true, cancelable: true }));
+        }, b);
+        await p.until(st => st.loaded, 'the binlog to load (' + label + ')');
+        p.loadMs = Date.now() - t;
+        await p.page.waitForTimeout(1500);
+        p.ctx = ctx;
+        return p;
+    }
+    const shotTo = (p, name) => p.page.screenshot({ path: path.join(path.dirname(path.resolve(opt.metrics || 'metrics.json')), name) });
+    const fv = await flatPage(binlog, 'flat');
+    const treeInfo = await fv.page.evaluate(() => globalThis.binlogBrowser.TreeInfo());
+    check(treeInfo.startsWith('flat|'), 'the browser defaults to the flat virtualized tree: ' + treeInfo);
+    metrics.flatDropToTreeMs = fv.loadMs;
+    await shotTo(fv, 'e2e-flat-1-tree.png');
+
+    const deep = await fv.page.evaluate(t => globalThis.binlogBrowser.GoToDeepTask(t), targetText === 'CoreCompile' ? 'Csc' : targetText);
+    const [okSel, realized, inView, rowIdx] = deep.split('|');
+    check(okSel === 'True' && realized === 'True' && inView === 'True', 'deep search result: ancestors expanded, row realized and scrolled into view: ' + deep);
+    metrics.flatDeepRowIndex = Number(rowIdx);
+    await shotTo(fv, 'e2e-flat-2-deep-result.png');
+
+    const rowCenter = await fv.page.evaluate(() => globalThis.binlogBrowser.SelectedRowCenter());
+    check(rowCenter !== '', 'the selected row is realized at ' + rowCenter);
+    const [rcx, rcy] = rowCenter.split(',').map(Number);
+    await fv.page.mouse.click(rcx, rcy, { button: 'right' });
+    await fv.page.waitForTimeout(700);
+    const sm = await fv.page.evaluate(() => globalThis.binlogBrowser.SelectionAndMenu());
+    check(/\|True\|[1-9]/.test(sm), 'right-click on a virtualized row opens the context menu: ' + sm);
+    await shotTo(fv, 'e2e-flat-3-context-menu.png');
+    await fv.page.keyboard.press('Escape');
+
+    const kb = await fv.page.evaluate(() => globalThis.binlogBrowser.KeyboardDown(120));
+    const [kb0, kb1, kbView, kbReal] = kb.split('|');
+    check(Number(kb1) - Number(kb0) >= 100 && kbView === 'True' && Number(kbReal) < 150, 'keyboard Down x120 crosses the virtualization boundary, selection stays in view: ' + kb);
+
+    const big = await fv.page.evaluate(() => globalThis.binlogBrowser.BigNodeToggle());
+    const [bk, brows, breal, bms, bcol, brx] = big.split('|');
+    check(Number(brows) >= Number(bk) && Number(breal) < 150 && bcol === 'True', 'large node expand/collapse: ' + big);
+    metrics.flatBigNode = { children: Number(bk), realized: Number(breal), expandMs: Number(bms), reexpandMs: Number(brx) };
+    await shotTo(fv, 'e2e-flat-4-big-node.png');
+
+    await fv.page.evaluate(() => globalThis.binlogBrowser.SetDarkTheme(true));
+    await fv.page.waitForTimeout(800);
+    await shotTo(fv, 'e2e-flat-5-dark.png');
+    await fv.page.evaluate(() => globalThis.binlogBrowser.SetDarkTheme(false));
+    check(fv.errors.length === 0, 'no console errors (flat tree)' + (fv.errors.length ? ': ' + fv.errors.slice(0, 3).join(' | ') : ''));
+    await fv.page.close();
+    if (opt.big) {
+        const bg = await flatPage(path.resolve(opt.big), 'big');
+        const r = await bg.page.evaluate(() => globalThis.binlogBrowser.BigNodeToggle());
+        const [k2, rows2, real2, ms2, col2, rx2] = r.split('|');
+        check(Number(k2) >= 10000 && Number(real2) < 150 && col2 === 'True', 'big log: node with ' + k2 + ' children expands, only ' + real2 + ' rows realized: ' + r);
+        metrics.flatBig = { loadMs: bg.loadMs, children: Number(k2), realized: Number(real2), expandMs: Number(ms2), reexpandMs: Number(rx2) };
+        await shotTo(bg, 'e2e-flat-6-big50k.png');
+        await bg.page.close();
+    }
+
     // ---- ?url= (warm: same context) ----
     const w = await visit(context, url + '?url=' + encodeURIComponent(origin + '/fixture.binlog'));
     const s2 = await w.until(s => s.loaded, 'the ?url= binlog to load');
