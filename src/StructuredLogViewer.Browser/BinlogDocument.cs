@@ -39,6 +39,11 @@ namespace StructuredLogViewer.Browser
             }
 
             var build = BinaryLog.ReadBuild(stream, progress, projectImportsArchive: null);
+
+            // same post-processing as the desktop viewer: project reference and target graphs, secrets and NuGet search
+            BuildAnalyzer.AnalyzeBuild(build);
+            build.SearchExtensions.Add(new SecretsSearch(build));
+            build.SearchExtensions.Add(new NuGetSearch(build));
             return new BinlogDocument(build).Initialize();
         }
 
