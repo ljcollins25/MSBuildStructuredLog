@@ -76,6 +76,32 @@ namespace StructuredLogViewer.Browser
 
         private MenuItem reloadMenu, saveAsMenu, statsMenu;
         private byte[] logBytes;
+        private JsPositionedSource logSource;
+
+        /// <summary>The log's bytes: held already for a downloaded log, read from the ranged source only when Save As / Statistics ask (a big log is never held whole otherwise).</summary>
+        private byte[] GetLogBytes()
+        {
+            if (logBytes != null || logSource == null)
+            {
+                return logBytes;
+            }
+
+            var all = new byte[logSource.Length];
+            long pos = 0;
+            while (pos < all.Length)
+            {
+                int n = logSource.Read(pos, all, (int)pos, (int)Math.Min(8 << 20, all.Length - pos));
+                if (n <= 0)
+                {
+                    break;
+                }
+
+                pos += n;
+            }
+
+            return all;
+        }
+
         private string logName;
         private string lastUrl;
 
@@ -93,29 +119,31 @@ namespace StructuredLogViewer.Browser
         {
             bool loaded = buildControl != null;
             reloadMenu.IsVisible = loaded && lastUrl != null;
-            saveAsMenu.IsVisible = loaded && logBytes != null;
-            statsMenu.IsVisible = loaded && logBytes != null && (logName ?? "").EndsWith(".binlog", StringComparison.OrdinalIgnoreCase);
+            saveAsMenu.IsVisible = loaded && (logBytes != null || logSource != null);
+            statsMenu.IsVisible = loaded && (logBytes != null || logSource != null) && (logName ?? "").EndsWith(".binlog", StringComparison.OrdinalIgnoreCase);
         }
 
         /// <summary>Save Log As: the opened bytes as a download (a binlog is copied losslessly, like the desktop does).</summary>
         public void SaveLogAs()
         {
-            if (logBytes != null)
+            var bytes = GetLogBytes();
+            if (bytes != null)
             {
-                JsInterop.DownloadBytes(logName, logBytes);
+                JsInterop.DownloadBytes(logName, bytes);
             }
         }
 
         /// <summary>Statistics: BinlogStats reads a file, so the bytes go to the in-memory file system first.</summary>
         public void ShowStatistics()
         {
-            if (buildControl == null || logBytes == null)
+            var bytes = buildControl == null ? null : GetLogBytes();
+            if (bytes == null)
             {
                 return;
             }
 
             string path = Path.Combine(Path.GetTempPath(), Path.GetFileName(logName));
-            File.WriteAllBytes(path, logBytes);
+            File.WriteAllBytes(path, bytes);
             try
             {
                 Document.Build.LogFilePath = path;
@@ -241,8 +269,9 @@ namespace StructuredLogViewer.Browser
                     ratio => JsInterop.Report($"progress {ratio:P0} heap {GC.GetTotalMemory(false) / 1048576} MB"));
                 double t1 = JsInterop.Now();
                 buildControl?.Dispose();
-                // the compressed log is never held whole on this path: Save As and Statistics (which need the bytes) stay hidden
+                // the compressed log is not held: Save As and Statistics read it from the source when asked
                 logBytes = null;
+                logSource = source;
                 logName = name;
                 if (!isUrl)
                 {
@@ -319,6 +348,7 @@ namespace StructuredLogViewer.Browser
 
                 buildControl?.Dispose();
                 logBytes = bytes;
+                logSource = null;
                 logName = name;
                 if (!isUrl)
                 {
