@@ -76,4 +76,36 @@ namespace Microsoft.Build.Logging.StructuredLogger
             return list;
         }
     }
+
+    /// <summary>
+    /// The items of one item type (the children of an AddItem node) kept as the item records that were read
+    /// from the log: the item spec and a reference to the shared metadata dictionary. An Item node, and its
+    /// metadata, are only created when the children of the AddItem node are requested.
+    /// </summary>
+    internal sealed class LazyItems : LazyChildren
+    {
+        private readonly List<Microsoft.Build.Framework.ITaskItem> items;
+        private readonly Action<Microsoft.Build.Framework.ITaskItem, Item> addMetadata;
+
+        public LazyItems(List<Microsoft.Build.Framework.ITaskItem> items, Action<Microsoft.Build.Framework.ITaskItem, Item> addMetadata)
+        {
+            this.items = items;
+            this.addMetadata = addMetadata;
+        }
+
+        public override int Count => items.Count;
+
+        public override IList<BaseNode> Create(TreeNode parent)
+        {
+            var list = new ChildrenList(items.Count);
+            foreach (var taskItem in items)
+            {
+                var item = new Item { Text = taskItem.ItemSpec };
+                addMetadata(taskItem, item);
+                list.Add(item);
+            }
+
+            return list;
+        }
+    }
 }

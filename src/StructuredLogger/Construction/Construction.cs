@@ -1121,6 +1121,7 @@ namespace Microsoft.Build.Logging.StructuredLogger
                 itemList.Cast<DictionaryEntry>(); // this should be unreachable
 
             AddItem currentItemNode = null;
+            List<ITaskItem> currentItems = null;
 
             foreach (DictionaryEntry kvp in entries)
             {
@@ -1128,24 +1129,52 @@ namespace Microsoft.Build.Logging.StructuredLogger
 
                 if (currentItemNode == null || currentItemNode.Name != itemType)
                 {
+                    CompleteItemGroup(currentItemNode, currentItems);
                     currentItemNode = new AddItem { Name = itemType };
+                    currentItems = new List<ITaskItem>();
                     itemsNode.AddChild(currentItemNode);
                 }
 
-                var itemNode = new Item();
-
                 if (kvp.Value is ITaskItem taskItem)
                 {
-                    itemNode.Text = SoftIntern(taskItem.ItemSpec);
-                    AddMetadata(taskItem, itemNode);
-                    currentItemNode.AddChild(itemNode);
+                    currentItems.Add(taskItem);
                 }
             }
+
+            CompleteItemGroup(currentItemNode, currentItems);
 
             if (!IsLargeBinlog)
             {
                 itemsNode.SortChildren();
             }
+        }
+
+        /// <summary>
+        /// Gives the AddItem node its items. They are kept as the records that were read and turned into
+        /// Item nodes (with their metadata) only when the children of the node are requested.
+        /// </summary>
+        private void CompleteItemGroup(AddItem node, List<ITaskItem> items)
+        {
+            if (node == null || items == null || items.Count == 0)
+            {
+                return;
+            }
+
+            if (!(items[0] is TaskItemData))
+            {
+                // items that did not come from the binary reader are small in number, create the nodes right away
+                foreach (var taskItem in items)
+                {
+                    var itemNode = new Item { Text = SoftIntern(taskItem.ItemSpec) };
+                    AddMetadata(taskItem, itemNode);
+                    node.AddChild(itemNode);
+                }
+
+                return;
+            }
+
+            items.TrimExcess();
+            node.TrySetLazyChildren(new LazyItems(items, AddMetadata));
         }
 
         private void AddPropertiesSorted(Folder propertiesFolder, TreeNode project, IEnumerable properties)
