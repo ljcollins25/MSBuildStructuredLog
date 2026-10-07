@@ -109,6 +109,40 @@ namespace StructuredLogViewer.Browser
             return await Dispatcher.UIThread.InvokeAsync(() => shell.BuildControl.TimelineControl.TextBlocks.Count.ToString());
         }
 
+        /// <summary>Opens Go to Tracing for a task and the graph tabs; returns "tracingBlocks|projectRefVertices|targetVertices|propertyVertices".</summary>
+        [JSExport]
+        public static async Task<string> GoToTracingAndGraphs(string taskName)
+        {
+            var shell = BrowserShell.Instance;
+            var build = shell.Document.Build;
+            var node = build.FindFirstDescendant<Microsoft.Build.Logging.StructuredLogger.Task>(t => t.Name != null && t.Name.Contains(taskName));
+            var project = build.FindFirstDescendant<Microsoft.Build.Logging.StructuredLogger.Project>(_ => true);
+            if (node == null || project == null)
+            {
+                return "no task or project";
+            }
+
+            string result = null;
+            await Dispatcher.UIThread.InvokeAsync(() =>
+            {
+                var bc = shell.BuildControl;
+                bc.SelectItem(node);
+                bc.GoToTracing();
+            });
+            await Task.Delay(1500);
+            await Dispatcher.UIThread.InvokeAsync(() =>
+            {
+                var bc = shell.BuildControl;
+                int tracing = bc.TracingControl.BlockCount;
+                int refs = bc.ProjectReferenceGraphHost?.GraphControl.DisplayedCount ?? -1;
+                int targets = bc.ShowTargetGraph(project)?.GraphControl.DisplayedCount ?? -1;
+                int props = bc.ShowPropertyGraph(project)?.GraphControl.DisplayedCount ?? -1;
+                result = $"{tracing}|{refs}|{targets}|{props}";
+            });
+            await Task.Delay(500);
+            return result;
+        }
+
         /// <summary>Switches the dark theme through SettingsService (persisted by the settings store).</summary>
         [JSExport]
         public static bool SetDarkTheme(bool dark)

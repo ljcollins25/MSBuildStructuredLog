@@ -93,6 +93,15 @@ try {
     await v.page.waitForTimeout(1500);
     await shot('e2e-3-source.png');
 
+    // ---- tracing and graph views (shared controls) ----
+    const tg = await v.page.evaluate(() => globalThis.binlogBrowser.GoToTracingAndGraphs('Csc'));
+    const [tracingBlocks, refVerts, targetVerts, propVerts] = tg.split('|').map(Number);
+    check(tracingBlocks > 0, 'tracing renders blocks: ' + tg);
+    check(refVerts > 0, 'project reference graph renders');
+    check(targetVerts > 0, 'target graph renders');
+    check(propVerts > 0, 'property graph renders');
+    await shot('e2e-6-graph.png');
+
     // ---- timeline (shared TimelineControl) ----
     const blocks = Number(await v.page.evaluate(() => globalThis.binlogBrowser.GoToTimeline('Csc')));
     await v.page.waitForTimeout(800);
