@@ -339,6 +339,19 @@ namespace StructuredLogViewer
             set => Set(ref enableTreeViewVirtualization, value);
         }
 
+        private static bool virtualizedTree = false;
+
+        /// <summary>Avalonia: show the main tree as a flat virtualized list instead of the TreeView.</summary>
+        public static bool VirtualizedTree
+        {
+            get => Get(ref virtualizedTree);
+
+            set => Set(ref virtualizedTree, value);
+        }
+
+        /// <summary>Default for the virtualized tree until a saved choice is read (the saved line always wins).</summary>
+        public static void SetDefaultVirtualizedTree(bool on) => virtualizedTree = on;
+
         private static bool markResultsInTree = false;
 
         public static bool MarkResultsInTree
@@ -366,11 +379,42 @@ namespace StructuredLogViewer
         }
 
         private static bool useDarkTheme = false;
+        private static bool useDarkThemeChosen = false;
+
+        /// <summary>True once the user has chosen a theme (or a saved choice was read); until then
+        /// <see cref="SetDefaultUseDarkTheme"/> (e.g. the OS / browser preference) decides.</summary>
+        public static bool UseDarkThemeChosen
+        {
+            get { EnsureSettingsRead(); return useDarkThemeChosen; }
+        }
+
         public static bool UseDarkTheme
         {
             get => Get(ref useDarkTheme);
 
-            set => Set(ref useDarkTheme, value);
+            set
+            {
+                EnsureSettingsRead();
+                if (!useDarkThemeChosen)
+                {
+                    useDarkThemeChosen = true;
+                    useDarkTheme = value;
+                    SaveSettings();
+                    return;
+                }
+
+                Set(ref useDarkTheme, value);
+            }
+        }
+
+        /// <summary>Theme to use while the user has not chosen one; not persisted.</summary>
+        public static void SetDefaultUseDarkTheme(bool dark)
+        {
+            EnsureSettingsRead();
+            if (!useDarkThemeChosen)
+            {
+                useDarkTheme = dark;
+            }
         }
 
         private static bool vsCodeHintDismissed = false;
@@ -426,6 +470,7 @@ namespace StructuredLogViewer
 
         const string Virtualization = "Virtualization=";
         const string MarkResultsInTreeSetting = "MarkResultsInTree=";
+        const string VirtualizedTreeSetting = "VirtualizedTree=";
         const string ShowConfigurationAndPlatformSetting = "ShowConfigurationAndPlatform=";
         const string UseDarkThemeSetting = "UseDarkTheme=";
         const string VSCodeHintDismissedSetting = "VSCodeHintDismissed=";
@@ -440,8 +485,13 @@ namespace StructuredLogViewer
             sb.AppendLine(Virtualization + enableTreeViewVirtualization.ToString());
             //sb.AppendLine(ParentAllTargetsUnderProjectSetting + parentAllTargetsUnderProject.ToString());
             sb.AppendLine(MarkResultsInTreeSetting + markResultsInTree.ToString());
+            sb.AppendLine(VirtualizedTreeSetting + virtualizedTree.ToString());
             sb.AppendLine(ShowConfigurationAndPlatformSetting + ShowConfigurationAndPlatform.ToString());
-            sb.AppendLine(UseDarkThemeSetting + useDarkTheme.ToString());
+            if (useDarkThemeChosen)
+            {
+                sb.AppendLine(UseDarkThemeSetting + useDarkTheme.ToString());
+            }
+
             sb.AppendLine(VSCodeHintDismissedSetting + vsCodeHintDismissed.ToString());
             sb.AppendLine(PreferredVSCodeVariantSetting + preferredVSCodeVariant);
             sb.AppendLine(WindowPositionSetting + windowPosition);
@@ -469,8 +519,14 @@ namespace StructuredLogViewer
                     ProcessLine(Virtualization, line, ref enableTreeViewVirtualization);
                     //ProcessLine(ParentAllTargetsUnderProjectSetting, line, ref parentAllTargetsUnderProject);
                     ProcessLine(MarkResultsInTreeSetting, line, ref markResultsInTree);
+                    ProcessLine(VirtualizedTreeSetting, line, ref virtualizedTree);
                     ProcessLine(ShowConfigurationAndPlatformSetting, line, ref ProjectOrEvaluationHelper.ShowConfigurationAndPlatform);
-                    ProcessLine(UseDarkThemeSetting, line, ref useDarkTheme);
+                    if (line.StartsWith(UseDarkThemeSetting))
+                    {
+                        ProcessLine(UseDarkThemeSetting, line, ref useDarkTheme);
+                        useDarkThemeChosen = true;
+                    }
+
                     ProcessLine(VSCodeHintDismissedSetting, line, ref vsCodeHintDismissed);
                     ProcessString(PreferredVSCodeVariantSetting, line, ref preferredVSCodeVariant);
                     ProcessString(WindowPositionSetting, line, ref windowPosition);

@@ -6,23 +6,23 @@ TextViewerControl and DocumentWell between the WPF and Avalonia code, plus the W
 The Avalonia column is the status of the shared UI; the browser column says works, or N/A with the reason. Effort: S hours, M a day, L several days.
 "to verify" means the code exists but is not yet exercised in the browser.
 
-Counts (Avalonia): present 63, partial 0, missing 3, N/A 1  (total 67)
+Counts (Avalonia): present 64, partial 0, missing 2, N/A 1  (total 67)
 
 | Area | Feature | Avalonia | Browser | Effort | Notes |
 |---|---|---|---|---|---|
 | Main window | File > Open Log (Ctrl+O) | present | works (file picker, drag and drop, ?url=) | - |  |
-| Main window | File > Open Graph (.dgml/.graph) | present | N/A: no file dialog path; desktop head only (graph files open via the picker) | - | GraphHostControl.FromFile; MainWindow menu + drop of .dgml/.graph/.txt |
-| Main window | File > Reload (F5) | present | N/A: no file path on disk; re-open the log | - | browser reloads from the original ?url= only |
-| Main window | File > Save Log As (Ctrl+S) | present | partial: download of a binlog written by the logger | S | verify with big logs in browser |
-| Main window | File > Redact Secrets (Ctrl+R) | present | to verify in browser | S | RedactInputControl exists |
-| Main window | File > Statistics | present | to verify in browser | S | Build.DisplayStats |
-| Main window | Recent Logs / Recent Projects, Clear | present | works (localStorage); recent logs hold names only | S | paths cannot be reopened in a browser |
+| Main window | File > Open Graph (.dgml/.graph) | present | left out of the menu: graph files open by drop; no separate dialog | - | GraphHostControl.FromFile |
+| Main window | File > Reload (F5) | present | works for a log opened from a URL (File menu, shown only then): downloads it again. Hidden for a picked or dropped file: the browser keeps no path to re-read | - | BrowserShell.lastUrl; e2e checks the menu for both |
+| Main window | File > Save Log As (Ctrl+S) | present | works: File menu, downloads the opened bytes unchanged (original file name); e2e checks name and size | - | BrowserShell.SaveLogAs, interop.js downloadBytes. Ctrl+S not bound (the browser's own save-page) |
+| Main window | File > Redact Secrets (Ctrl+R) | present | N/A for now: rewrites the log through a file save dialog and re-opens it; left out of the browser menu until a download-and-reopen flow is designed | S | RedactInputControl exists |
+| Main window | File > Statistics | present | works: File menu (binlogs only), adds the Statistics node to the tree; e2e checks it | - | BinlogStats reads a file, so the bytes are written to the in-memory file system for the call |
+| Main window | Recent Logs / Recent Projects, Clear | present | not in the browser menu: recent logs hold names only and cannot be reopened (settings still stored) | S | paths cannot be reopened in a browser |
 | Main window | Start Page, welcome screen | present | works: shared WelcomeScreen; Open Project/Solution hidden (needs MSBuild) | - | WelcomeScreen.ShowOpenProject/ShowOpenFromUrl |
 | Main window | Open from URL (start page box and ?url=) | present | works: HTTP Range when the server supports it (else one download); CORS, HTML and non-binlog responses give a clear message on the start page | - | browser-only; ILogSource/ILogSourceProvider (LogSource.cs) is the plug-in point for the paged reader; e2e covers CORS, no-Range, 404, HTML |
-| Main window | Enable tree virtualization (setting) | missing | missing: Avalonia TreeView cannot virtualize; every expanded node is a live control, so a node with ~50k children is slow and memory-hungry | L | App.xaml comment: only the root level virtualizes and it breaks AutoScrollToSelectedItem (AvaloniaUI/Avalonia#10985). Evaluated TreeDataGrid, see the section below: not adoptable (licence); a flat virtualized list is the licence-free route |
+| Main window | Enable tree virtualization (setting) | present | "Virtualized tree" checkbox on the start page: the main tree becomes a flat virtualized list (FlatTreeView); the TreeView stays as the fallback. On by default in the browser, off on desktop | L | expand of a 50k-child node: 48.8 s / 4.6 GB -> 0.16 s / 67 MB (see the section below). Takes effect for the next opened log |
 | Main window | Build / Rebuild Solution/Project (F6, Shift+F6) | present | N/A: runs MSBuild, a browser cannot start processes | - | to hide |
 | Main window | Set MSBuild path | present | N/A: no MSBuild in a browser | - | to hide |
-| Main window | Help: Search Syntax, links, About | present | works | S | links open in a new tab |
+| Main window | Help: Search Syntax, links | present | works: Help menu with Search Syntax and the two project links, each opens in a new tab. About not added | - | JsInterop.OpenUrl |
 | Main window | Exit (Alt+F4) | present | N/A: no window to close | - | to hide |
 | Main window | Open in VS Code, VS Code variant dropdown, hint bar | missing | N/A: starts a local program | - | desktop-only; port the buttons to the Avalonia head later |
 | Main window | Attach binlog (multi-log) button | present | N/A: it only adds binlogs to the VS Code hand-off, which a browser cannot start | - | BuildControl.AttachBinlog stays for the desktop head |
@@ -89,3 +89,23 @@ Counts (Avalonia): present 63, partial 0, missing 3, N/A 1  (total 67)
 2. Timeline (done), save/reload/recent, statistics checks in the browser.
 3. Tracing, then the graph views (project references, targets, NuGet, properties).
 4. Redact secrets in the browser; the long tail (Open Graph, attach binlog, favorites persistence).
+
+### Flat virtualized tree: implemented and measured
+`FlatTreeView` (StructuredLogViewer.Avalonia.Core) lists one recycled row per visible node (node, depth, expander) in a ListBox; expanding inserts the child rows as one range, collapsing removes them, and the existing node templates draw each node. Selection, Go to / search (expand ancestors, then scroll the row into view), right-click selection, context menu, copy commands, double-click / Enter, Left/Right expand-collapse, search-result dots and both themes work on it. Setting: `SettingsService.VirtualizedTree` (start page checkbox; default on in the browser, off on desktop).
+
+Desktop headless benchmark (`--bench`, repeat with `src/StructuredLogViewer.Avalonia.Headless/tools/gen-big50k.sh`), synthetic node with 50,000 children:
+
+| | TreeView | Flat tree |
+|---|---|---|
+| expand | 48,789 ms | 174 ms |
+| managed memory after expand | 4,611 MB | ~70 MB |
+| realized rows | 50,024 | 42 |
+| collapse / re-expand | 179 / 491 ms | 75 / 78 ms |
+| time to first tree | 1,598 ms | 1,633 ms |
+| scroll to end (jumps of 4 viewports per frame: every row rebuilt each frame) | 5.3 s, frame median 19 ms, p95 20 ms | 9.2 s, frame median 25 ms, p95 46 ms |
+| wheel-like scroll (3 rows per frame, 300 frames) | frame median 18.8 ms, p95 19.8 ms | frame median 11.0 ms, p95 16.1 ms |
+
+Real dotnet/runtime CI binlog (largest node: 4,366 children): expand 4.9 s -> 0.4 s, realized rows 4,475 -> 37; time to first tree unchanged (34.6 s, parse dominated).
+Scrolling: the page-jump stress test rebuilds every visible row each frame and is slower than the TreeView (which keeps all rows alive); realistic wheel-sized scrolling is faster than the TreeView. A one-TextBlock-per-row visual was tried: it only cut the page-jump median from 25 to 17 ms (wheel: 9.5 ms) while dropping the per-type node templates, so it was not adopted. Browser frame times were not measured (the e2e checks behaviour, not frame times).
+
+Browser e2e (tools/e2e.mjs, fixture + the 50k log): default is the flat tree; a deep search result is expanded, realized and scrolled into view; right-click on a virtualized row opens the context menu; 120 Down presses cross the virtualization boundary with the selection in view; a 50,000-child node expands in ~0.4 s with 43 rows realized, collapses and re-expands (~0.27 s).

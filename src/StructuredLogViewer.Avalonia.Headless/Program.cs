@@ -20,6 +20,11 @@ namespace StructuredLogViewer.Avalonia
     {
         private static int Main(string[] args)
         {
+            if (args.Length >= 3 && args[0] == "--bench")
+            {
+                return Bench.Run(args);
+            }
+
             if (args.Length < 2)
             {
                 Console.Error.WriteLine("usage: <log.binlog> <outDir> [--dark]");

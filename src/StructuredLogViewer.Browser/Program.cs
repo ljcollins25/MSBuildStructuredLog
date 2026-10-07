@@ -12,6 +12,9 @@ namespace StructuredLogViewer.Browser
         {
             BrowserApp.Configure();
             StructuredLogViewer.SettingsService.Store = new BrowserSettingsStore();
+            BrowserTheme.Init();
+            // the flat virtualized tree passes the browser e2e (tools/e2e.mjs); the TreeView stays selectable on the start page
+            StructuredLogViewer.SettingsService.SetDefaultVirtualizedTree(true);
             return BuildAvaloniaApp().StartBrowserAppAsync("out");
         }
 

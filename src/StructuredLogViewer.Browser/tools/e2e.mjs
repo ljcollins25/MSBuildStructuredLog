@@ -87,6 +87,39 @@ try {
     check(controls.includes('openFromUrl') && controls.includes('urlText') && !controls.includes('openProject'),
         'start page: Open from URL shown, Open Project/Solution hidden (' + controls.join(',') + ')');
     await u.page.screenshot({ path: path.join(path.dirname(path.resolve(opt.metrics || 'metrics.json')), 'e2e-0-start.png') });
+    // ---- dark theme: live switch from the start page checkbox, persisted ----
+    const info = async pg => (await pg.evaluate(() => globalThis.binlogBrowser.GetThemeInfo())).split('|');
+    const light = await info(u.page);
+    check(light[0] === 'Light', 'light theme by default (prefers light): ' + light.join('|'));
+    const center = await u.page.evaluate(() => globalThis.binlogBrowser.GetDarkThemeCheckBoxCenter());
+    check(center !== '', 'Dark Theme checkbox is on the start page: ' + center);
+    const [cx, cy] = center.split(',').map(Number);
+    await u.page.mouse.click(cx, cy); // a real click, like the user
+    await u.page.waitForTimeout(500);
+    const dark = await info(u.page);
+    check(dark[0] === 'Dark' && dark[1] !== light[1], 'ticking Dark Theme switches live, without a reload: ' + dark.join('|') + ' (was ' + light[1] + ')');
+    check(dark[2] === 'checked', 'the checkbox shows ticked: ' + dark[2]);
+    await u.page.screenshot({ path: path.join(path.dirname(path.resolve(opt.metrics || 'metrics.json')), 'e2e-0c-start-dark.png') });
+    check(/UseDarkTheme=True/.test(await u.page.evaluate(() => localStorage.getItem('binlog:Settings.txt')) || ''), 'the choice is saved');
+    await u.page.reload();
+    await u.until(s => !!s.status, 'the app to restart', 120000);
+    await u.until(s => !!s.status, 'the shell to appear', 60000);
+    await u.page.waitForTimeout(1000);
+    check((await info(u.page))[0] === 'Dark', 'dark theme persists after a reload');
+    await u.page.evaluate(() => globalThis.binlogBrowser.TickDarkThemeCheckBox(false));
+    await u.page.waitForTimeout(300);
+    check((await info(u.page))[0] === 'Light', 'unticking switches back live');
+    // never chosen: follows prefers-color-scheme
+    const darkCtx = await browser.newContext({ colorScheme: 'dark' });
+    const pd = await visit(darkCtx, url);
+    await pd.until(s => !!s.status, 'the app to start (dark scheme)', 120000);
+    await pd.until(s => !!s.status, 'the shell to appear', 60000);
+    await pd.page.waitForTimeout(1000);
+    check((await info(pd.page))[0] === 'Dark', 'follows prefers-color-scheme: dark when never chosen');
+    await pd.page.emulateMedia({ colorScheme: 'light' });
+    await pd.page.waitForTimeout(500);
+    check((await info(pd.page))[0] === 'Light', 'and follows it live when the OS scheme changes');
+    await pd.page.close(); await darkCtx.close();
     const tryUrl = async address => u.page.evaluate(a => globalThis.binlogBrowser.OpenUrl(a), address);
     let msg = await tryUrl(otherOrigin + '/nocors.binlog');
     check(/cross-origin|CORS/i.test(msg), 'no CORS headers gives a CORS message: ' + msg.slice(0, 60));
@@ -190,8 +223,18 @@ try {
     const dlText = dl ? fs.readFileSync(await dl.path(), 'utf8') : '';
     check(!!dl && dlText.length > 0 && dl.suggestedFilename() === path.basename(opened), 'Save downloads the file: ' + (dl?.suggestedFilename() ?? 'no download') + ' (' + dlText.length + ' chars)');
 
-    // ---- settings persist in localStorage ----
+    // File menu with a dropped (local) log: no Reload (nothing to re-fetch); Save Log As and Statistics work
+    check(await v.page.evaluate(() => globalThis.binlogBrowser.GetFileMenu()) === 'Save Log As,Statistics', 'File menu for a dropped log: ' + await v.page.evaluate(() => globalThis.binlogBrowser.GetFileMenu()));
+    await v.page.evaluate(() => globalThis.binlogBrowser.SaveLogAs());
+    const saved = await v.page.evaluate(() => globalThis.binlogLastDownload);
+    check(saved?.name === 'fixture.binlog' && saved.length === metrics.binlogBytes, 'Save Log As downloads the original bytes: ' + JSON.stringify(saved));
+    const statsName = await v.page.evaluate(() => globalThis.binlogBrowser.ShowStatistics());
+    check(/Statistics/.test(statsName), 'Statistics adds the Statistics node: ' + statsName);
+    // ---- dark theme: live switch with a log open, then persisted in localStorage ----
+    const lightLoaded = (await v.page.evaluate(() => globalThis.binlogBrowser.GetThemeInfo())).split('|');
     check(await v.page.evaluate(() => globalThis.binlogBrowser.SetDarkTheme(true)), 'dark theme switched on');
+    const darkLoaded = (await v.page.evaluate(() => globalThis.binlogBrowser.GetThemeInfo())).split('|');
+    check(darkLoaded[0] === 'Dark' && darkLoaded[1] !== lightLoaded[1], 'with a log open the theme switches live: ' + lightLoaded[1] + ' -> ' + darkLoaded[1]);
     const stored = await v.page.evaluate(() => localStorage.getItem('binlog:Settings.txt'));
     check(!!stored && /UseDarkTheme/i.test(stored) && /true/i.test(stored), 'settings written to localStorage');
     await v.page.reload();
@@ -202,11 +245,80 @@ try {
     check(v.failed.length === 0, 'no failed requests (drop)' + (v.failed.length ? ': ' + v.failed.slice(0, 3).join(' | ') : ''));
     await v.page.close();
 
+    // ---- flat virtualized tree (setting on) ----
+    async function flatPage(file, label) {
+        const ctx = await browser.newContext();
+        const p = await visit(ctx, url);
+        await p.until(st => !!st.status, 'the app to start (' + label + ')', 120000);
+        const b = fs.readFileSync(file).toString('base64');
+        const t = Date.now();
+        await p.page.evaluate(async b64 => {
+            const bytes = Uint8Array.from(atob(b64), c => c.charCodeAt(0));
+            const dt = new DataTransfer();
+            dt.items.add(new File([bytes], 'flat.binlog', { type: 'application/octet-stream' }));
+            document.dispatchEvent(new DragEvent('drop', { dataTransfer: dt, bubbles: true, cancelable: true }));
+        }, b);
+        await p.until(st => st.loaded, 'the binlog to load (' + label + ')');
+        p.loadMs = Date.now() - t;
+        await p.page.waitForTimeout(1500);
+        p.ctx = ctx;
+        return p;
+    }
+    const shotTo = (p, name) => p.page.screenshot({ path: path.join(path.dirname(path.resolve(opt.metrics || 'metrics.json')), name) });
+    const fv = await flatPage(binlog, 'flat');
+    const treeInfo = await fv.page.evaluate(() => globalThis.binlogBrowser.TreeInfo());
+    check(treeInfo.startsWith('flat|'), 'the browser defaults to the flat virtualized tree: ' + treeInfo);
+    metrics.flatDropToTreeMs = fv.loadMs;
+    await shotTo(fv, 'e2e-flat-1-tree.png');
+
+    const deep = await fv.page.evaluate(t => globalThis.binlogBrowser.GoToDeepTask(t), targetText === 'CoreCompile' ? 'Csc' : targetText);
+    const [okSel, realized, inView, rowIdx] = deep.split('|');
+    check(okSel === 'True' && realized === 'True' && inView === 'True', 'deep search result: ancestors expanded, row realized and scrolled into view: ' + deep);
+    metrics.flatDeepRowIndex = Number(rowIdx);
+    await shotTo(fv, 'e2e-flat-2-deep-result.png');
+
+    const rowCenter = await fv.page.evaluate(() => globalThis.binlogBrowser.SelectedRowCenter());
+    check(rowCenter !== '', 'the selected row is realized at ' + rowCenter);
+    const [rcx, rcy] = rowCenter.split(',').map(Number);
+    await fv.page.mouse.click(rcx, rcy, { button: 'right' });
+    await fv.page.waitForTimeout(700);
+    const sm = await fv.page.evaluate(() => globalThis.binlogBrowser.SelectionAndMenu());
+    check(/\|True\|[1-9]/.test(sm), 'right-click on a virtualized row opens the context menu: ' + sm);
+    await shotTo(fv, 'e2e-flat-3-context-menu.png');
+    await fv.page.keyboard.press('Escape');
+
+    const kb = await fv.page.evaluate(() => globalThis.binlogBrowser.KeyboardDown(120));
+    const [kb0, kb1, kbView, kbReal] = kb.split('|');
+    check(Number(kb1) - Number(kb0) >= 100 && kbView === 'True' && Number(kbReal) < 150, 'keyboard Down x120 crosses the virtualization boundary, selection stays in view: ' + kb);
+
+    const big = await fv.page.evaluate(() => globalThis.binlogBrowser.BigNodeToggle());
+    const [bk, brows, breal, bms, bcol, brx] = big.split('|');
+    check(Number(brows) >= Number(bk) && Number(breal) < 150 && bcol === 'True', 'large node expand/collapse: ' + big);
+    metrics.flatBigNode = { children: Number(bk), realized: Number(breal), expandMs: Number(bms), reexpandMs: Number(brx) };
+    await shotTo(fv, 'e2e-flat-4-big-node.png');
+
+    await fv.page.evaluate(() => globalThis.binlogBrowser.SetDarkTheme(true));
+    await fv.page.waitForTimeout(800);
+    await shotTo(fv, 'e2e-flat-5-dark.png');
+    await fv.page.evaluate(() => globalThis.binlogBrowser.SetDarkTheme(false));
+    check(fv.errors.length === 0, 'no console errors (flat tree)' + (fv.errors.length ? ': ' + fv.errors.slice(0, 3).join(' | ') : ''));
+    await fv.page.close();
+    if (opt.big) {
+        const bg = await flatPage(path.resolve(opt.big), 'big');
+        const r = await bg.page.evaluate(() => globalThis.binlogBrowser.BigNodeToggle());
+        const [k2, rows2, real2, ms2, col2, rx2] = r.split('|');
+        check(Number(k2) >= 10000 && Number(real2) < 150 && col2 === 'True', 'big log: node with ' + k2 + ' children expands, only ' + real2 + ' rows realized: ' + r);
+        metrics.flatBig = { loadMs: bg.loadMs, children: Number(k2), realized: Number(real2), expandMs: Number(ms2), reexpandMs: Number(rx2) };
+        await shotTo(bg, 'e2e-flat-6-big50k.png');
+        await bg.page.close();
+    }
+
     // ---- ?url= (warm: same context) ----
     const w = await visit(context, url + '?url=' + encodeURIComponent(origin + '/fixture.binlog'));
     const s2 = await w.until(s => s.loaded, 'the ?url= binlog to load');
     metrics.urlWarmToTreeMs = Date.now() - w.t0;
     check(s2.loaded, '?url= opens the binlog: ' + s2.status);
+    check(await w.page.evaluate(() => globalThis.binlogBrowser.GetFileMenu()) === 'Reload,Save Log As,Statistics', 'File menu for a log from a URL has Reload: ' + await w.page.evaluate(() => globalThis.binlogBrowser.GetFileMenu()));
     check(w.errors.length === 0, 'no console errors (?url=)' + (w.errors.length ? ': ' + w.errors.slice(0, 3).join(' | ') : ''));
     await w.page.close();
 

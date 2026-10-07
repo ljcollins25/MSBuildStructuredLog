@@ -113,6 +113,9 @@ globalThis.binlogOpenFile = async file => {
     await api.OpenPendingFile(file.name);
 };
 
+// follow the OS / browser color scheme until the user has chosen (decided in BrowserTheme)
+globalThis.matchMedia?.('(prefers-color-scheme: dark)').addEventListener('change', e => api.OnSchemeChanged(e.matches));
+
 // Ctrl+F focuses the app's search box once a log is open (Avalonia handles the key; this only stops the browser's find bar)
 document.addEventListener('keydown', event => {
     if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'f' && JSON.parse(api.GetState()).loaded) {

@@ -102,6 +102,8 @@ namespace StructuredLogViewer.Avalonia.Controls
         private ContextMenu sharedTreeContextMenu;
         private ContextMenu filesTreeContextMenu;
         private TreeView treeView;
+        private FlatTreeView flatTree;
+        private Control mainTree;
         public SearchAndResultsControl searchLogControl;
         private SearchAndResultsControl findInFilesControl;
         private SearchAndResultsControl propertiesAndItemsControl;
@@ -140,7 +142,22 @@ namespace StructuredLogViewer.Avalonia.Controls
         private TextBlock findLabel;
         private TextBox findTextBox;
 
-        public TreeView ActiveTreeView;
+        public Control ActiveTreeView;
+
+        /// <summary>The main tree control (TreeView, or the flat virtualized list).</summary>
+        public Control MainTreeControl => mainTree ?? treeView;
+
+        /// <summary>The selected node of the main tree.</summary>
+        public object SelectedMainNode => MainSelectedItem;
+
+        private object MainSelectedItem => SelectedOf(mainTree ?? treeView);
+
+        private static object SelectedOf(Control tree) => tree is FlatTreeView flat ? flat.SelectedNode : (tree as TreeView)?.SelectedItem;
+
+        private static IEnumerable ItemsOf(Control tree) => tree is FlatTreeView flat ? flat.RootNodes : (tree as TreeView)?.Items ?? (IEnumerable)Array.Empty<object>();
+
+        /// <summary>True when the main tree has no pending layout (benchmarks wait on this).</summary>
+        public bool IsTreeLayoutSettled() => MainTreeControl.IsMeasureValid && MainTreeControl.IsArrangeValid;
 
         private PropertiesAndItemsSearch propertiesAndItemsSearch;
         private SecretsSearch secretsSearch;
@@ -325,10 +342,10 @@ namespace StructuredLogViewer.Avalonia.Controls
             propertyGraphItem = new MenuItem { Header = "Property graph" };
             viewInTargetGraphItem = new MenuItem { Header = "Target graph" };
             nugetGraphItem = new MenuItem { Header = "NuGet graph" };
-            targetGraphItem.Click += (s, a) => ViewTargetGraph(treeView.SelectedItem as IProjectOrEvaluation);
-            propertyGraphItem.Click += (s, a) => ViewPropertyGraph(treeView.SelectedItem as IProjectOrEvaluation);
-            viewInTargetGraphItem.Click += (s, a) => ViewTargetGraphForTarget(treeView.SelectedItem as Target);
-            nugetGraphItem.Click += (s, a) => ViewNuGetGraph(treeView.SelectedItem as IProjectOrEvaluation);
+            targetGraphItem.Click += (s, a) => ViewTargetGraph(MainSelectedItem as IProjectOrEvaluation);
+            propertyGraphItem.Click += (s, a) => ViewPropertyGraph(MainSelectedItem as IProjectOrEvaluation);
+            viewInTargetGraphItem.Click += (s, a) => ViewTargetGraphForTarget(MainSelectedItem as Target);
+            nugetGraphItem.Click += (s, a) => ViewNuGetGraph(MainSelectedItem as IProjectOrEvaluation);
             searchInclusiveWithinThisTimespan = new MenuItem() { Header = "Search overlapping this duration" };
             searchExclusiveWithinThisTimespan = new MenuItem() { Header = "Search within this duration" };
             favoriteItem = new MenuItem() { Header = "Add to Favorites" };
@@ -349,18 +366,18 @@ namespace StructuredLogViewer.Avalonia.Controls
             favoriteItem.Click += (s, a) => AddToFavorites();
             unfavoriteItem.Click += (s, a) => RemoveFromFavorites();
             copyItem.Click += (s, a) => Copy();
-            copySubtreeItem.Click += (s, a) => CopySubtree(treeView);
-            copyVisibleSubtreeItem.Click += (s, a) => CopySubtree(treeView, visibleOnly: true);
+            copySubtreeItem.Click += (s, a) => CopySubtree(mainTree);
+            copyVisibleSubtreeItem.Click += (s, a) => CopySubtree(mainTree, visibleOnly: true);
             sortChildrenByNameItem.Click += (s, a) => SortChildrenByName();
             sortChildrenByDurationItem.Click += (s, a) => SortChildrenByDuration();
             filterChildrenItem.Click += (s, a) => FilterChildren();
             copyNameItem.Click += (s, a) => CopyName();
             copyValueItem.Click += (s, a) => CopyValue();
-            viewSourceItem.Click += (s, a) => Invoke(treeView.SelectedItem as BaseNode);
-            viewFullTextItem.Click += (s, a) => ViewFullText(treeView.SelectedItem as BaseNode);
-            searchNuGetItem.Click += (s, a) => SearchNuGet(treeView.SelectedItem as IProjectOrEvaluation);
+            viewSourceItem.Click += (s, a) => Invoke(MainSelectedItem as BaseNode);
+            viewFullTextItem.Click += (s, a) => ViewFullText(MainSelectedItem as BaseNode);
+            searchNuGetItem.Click += (s, a) => SearchNuGet(MainSelectedItem as IProjectOrEvaluation);
             showFileInExplorerItem.Click += (s, a) => ShowFileInExplorer();
-            preprocessItem.Click += (s, a) => Preprocess(treeView.SelectedItem as IPreprocessable);
+            preprocessItem.Click += (s, a) => Preprocess(MainSelectedItem as IPreprocessable);
             hideItem.Click += (s, a) => Delete();
             separator1 = new Separator();
             separator2 = new Separator();
@@ -428,6 +445,29 @@ namespace StructuredLogViewer.Avalonia.Controls
                 return treeViewItemStyle;
             }
 
+            if (SettingsService.VirtualizedTree)
+            {
+                // flat virtualized list instead of the TreeView
+                flatTree = new FlatTreeView();
+                mainTree = flatTree;
+                var host = (Panel)treeView.Parent;
+                host.Children.Insert(host.Children.IndexOf(treeView), flatTree);
+                host.Children.Remove(treeView);
+                treeView.ItemsSource = null;
+                flatTree.BorderThickness = new Thickness(0);
+                flatTree.BorderBrush = Brushes.Transparent;
+                flatTree.Classes.Add("searchable");
+                flatTree.Root = build;
+                flatTree.SelectedNodeChanged += n => OnMainSelectionChanged(n);
+                flatTree.ContextMenu = contextMenu;
+                RegisterTreeViewHandlers(flatTree);
+                flatTree.KeyUp += TreeView_KeyUp;
+                flatTree.GotFocus += TreeView_GotFocus;
+                ActiveTreeView = flatTree;
+            }
+            else
+            {
+                mainTree = treeView;
             treeView.ContextMenu = contextMenu;
             treeView.Styles.Add(GetTreeViewItemStyle());
             RegisterTreeViewHandlers(treeView);
@@ -439,6 +479,7 @@ namespace StructuredLogViewer.Avalonia.Controls
             treeView.GotFocus += TreeView_GotFocus;
 
             ActiveTreeView = treeView;
+            }
 
             findTextBox.KeyDown += FindTextBox_KeyDown;
             findTextBox.TextChanged += FindTextBox_TextChanged;
@@ -753,7 +794,7 @@ Right-clicking a project node may show the 'Preprocess' option if the version of
                 (graphTab.Content as GraphHostControl)?.Dispose();
             }
 
-            UnregisterTreeViewHandlers(treeView);
+            UnregisterTreeViewHandlers(mainTree ?? treeView);
             UnregisterTreeViewHandlers(searchLogControl.ResultsList);
             UnregisterTreeViewHandlers(propertiesAndItemsControl.ResultsList);
             UnregisterTreeViewHandlers(findInFilesControl.ResultsList);
@@ -805,6 +846,13 @@ Right-clicking a project node may show the 'Preprocess' option if the version of
             treeView.GotFocus -= TreeView_GotFocus;
             treeView.ItemsSource = null;
             treeView.ContextMenu = null;
+            if (flatTree != null)
+            {
+                flatTree.KeyUp -= TreeView_KeyUp;
+                flatTree.GotFocus -= TreeView_GotFocus;
+                flatTree.Reset();
+                flatTree.ContextMenu = null;
+            }
 
             TemplateApplied -= BuildControl_Loaded;
 
@@ -873,7 +921,7 @@ Right-clicking a project node may show the 'Preprocess' option if the version of
 
         private void TreeView_GotFocus(object sender, FocusChangedEventArgs e)
         {
-            if (sender is TreeView focusedTree)
+            if (sender is TreeView or FlatTreeView && sender is Control focusedTree)
             {
                 ActiveTreeView = focusedTree;
             }
@@ -884,14 +932,14 @@ Right-clicking a project node may show the 'Preprocess' option if the version of
             ActiveTreeView = findInFilesControl.ResultsList;
         }
 
-        private void RegisterTreeViewHandlers(TreeView treeView)
+        private void RegisterTreeViewHandlers(Control treeView)
         {
             treeView.AddHandler(PointerPressedEvent, SharedTreeView_PointerPressed, RoutingStrategies.Tunnel);
             treeView.DoubleTapped += SharedTreeView_DoubleTapped;
             treeView.KeyDown += SharedTreeView_KeyDown;
         }
 
-        private void UnregisterTreeViewHandlers(TreeView treeView)
+        private void UnregisterTreeViewHandlers(Control treeView)
         {
             treeView.RemoveHandler(PointerPressedEvent, SharedTreeView_PointerPressed);
             treeView.DoubleTapped -= SharedTreeView_DoubleTapped;
@@ -904,17 +952,24 @@ Right-clicking a project node may show the 'Preprocess' option if the version of
         // TreeView.SelectedItem (what the menu handlers read) must be set explicitly.
         private void SharedTreeView_PointerPressed(object sender, PointerPressedEventArgs e)
         {
-            var treeView = (TreeView)sender;
+            var treeView = (Control)sender;
             if (e.GetCurrentPoint(treeView).Properties.IsRightButtonPressed)
             {
                 // right-click doesn't move focus, so mark this tree active for the
                 // shared context menu commands as well
                 ActiveTreeView = treeView;
 
-                var item = (e.Source as Visual)?.FindAncestorOfType<TreeViewItem>(includeSelf: true);
-                if (item?.DataContext != null)
+                var rightClicked = NodeFromSource(e.Source, out _);
+                if (rightClicked != null)
                 {
-                    treeView.SelectedItem = item.DataContext;
+                    if (treeView is FlatTreeView flat)
+                    {
+                        flat.SelectedNode = rightClicked;
+                    }
+                    else if (treeView is TreeView tv)
+                    {
+                        tv.SelectedItem = rightClicked;
+                    }
                 }
             }
         }
@@ -922,10 +977,25 @@ Right-clicking a project node may show the 'Preprocess' option if the version of
         // invoke the node that was actually double-clicked, guarded by IsSelected so
         // that double-clicking an expander chevron doesn't invoke an unrelated node
         // (mirrors the WPF OnItemDoubleClick guard)
+        private static BaseNode NodeFromSource(object source, out bool isSelected)
+        {
+            var visual = source as Visual;
+            var tvi = visual?.FindAncestorOfType<TreeViewItem>(includeSelf: true);
+            if (tvi != null)
+            {
+                isSelected = tvi.IsSelected;
+                return tvi.DataContext as BaseNode;
+            }
+
+            var lbi = visual?.FindAncestorOfType<ListBoxItem>(includeSelf: true);
+            isSelected = lbi?.IsSelected ?? false;
+            return (lbi?.DataContext as FlatRow)?.Node;
+        }
+
         private void SharedTreeView_DoubleTapped(object sender, TappedEventArgs e)
         {
-            var item = (e.Source as Visual)?.FindAncestorOfType<TreeViewItem>(includeSelf: true);
-            if (item is { IsSelected: true, DataContext: BaseNode node })
+            var node = NodeFromSource(e.Source, out bool isSelected);
+            if (node != null && isSelected)
             {
                 e.Handled = Invoke(node) || ViewFullText(node);
             }
@@ -938,7 +1008,7 @@ Right-clicking a project node may show the 'Preprocess' option if the version of
                 return;
             }
 
-            var treeView = (TreeView)sender;
+            var treeView = (Control)sender;
 
             if (e.KeyModifiers == KeyModifiers.None)
             {
@@ -950,7 +1020,7 @@ Right-clicking a project node may show the 'Preprocess' option if the version of
 
                 if (e.Key == Key.Space || e.Key == Key.Return)
                 {
-                    if (treeView.SelectedItem is BaseNode node)
+                    if (SelectedOf(treeView) is BaseNode node)
                     {
                         e.Handled = Invoke(node) || ViewFullText(node);
                     }
@@ -1258,7 +1328,7 @@ Right-clicking a project node may show the 'Preprocess' option if the version of
 
         public void GoToTracing()
         {
-            if (treeView.SelectedItem is TimedNode treeNode)
+            if (MainSelectedItem is TimedNode treeNode)
             {
                 centralTabControl.SelectedItem = tracingTab;
                 PopulateTrace();
@@ -1284,7 +1354,7 @@ Right-clicking a project node may show the 'Preprocess' option if the version of
 
         public void GoToTimeLine()
         {
-            if (treeView.SelectedItem is TimedNode treeNode)
+            if (MainSelectedItem is TimedNode treeNode)
             {
                 centralTabControl.SelectedItem = timelineTab;
                 PopulateTimeline();
@@ -1548,7 +1618,7 @@ Recent ("));
 
         private void ContextMenu_Opened(object sender, RoutedEventArgs e)
         {
-            var node = treeView.SelectedItem as BaseNode;
+            var node = MainSelectedItem as BaseNode;
             var nameValueVisibility = node is NameValueNode;
             copyNameItem.IsVisible = nameValueVisibility;
             copyValueItem.IsVisible = nameValueVisibility;
@@ -1651,7 +1721,7 @@ Recent ("));
 
         private void SharedTreeContextMenu_Opened(object sender, RoutedEventArgs e)
         {
-            var node = ActiveTreeView?.SelectedItem as BaseNode;
+            var node = SelectedOf(ActiveTreeView) as BaseNode;
             bool isFavorite = node != null && IsFavorite(node);
             favoriteSharedItem.IsVisible = !isFavorite;
             unfavoriteSharedItem.IsVisible = isFavorite;
@@ -2022,7 +2092,7 @@ Recent ("));
             if (node != null)
             {
                 SelectItem(node);
-                treeView.Focus();
+                MainTreeControl.Focus();
                 e.Handled = true;
             }
 
@@ -2034,10 +2104,14 @@ Recent ("));
         {
             if (e.Property != TreeView.SelectedItemProperty) return;
 
-            var item = treeView.SelectedItem;
+            OnMainSelectionChanged(MainSelectedItem);
+        }
+
+        private void OnMainSelectionChanged(object item)
+        {
             if (item != null)
             {
-                SelectedTreeViewItem = treeView.TreeContainerFromItem(item) as TreeViewItem;
+                SelectedTreeViewItem = treeView?.TreeContainerFromItem(item) as TreeViewItem;
                 UpdateBreadcrumb(item);
                 UpdateProjectContext(item);
                 UpdateFindContent();
@@ -2180,7 +2254,7 @@ Recent ("));
                 if (firstError != null)
                 {
                     SelectItem(firstError);
-                    treeView.Focus();
+                    MainTreeControl.Focus();
                 }
 
                 if (InitialSearchText == null)
@@ -2220,6 +2294,14 @@ Recent ("));
             // the selection. And if it exists but is stale (ancestors were re-expanded),
             // BringIntoView scrolls using pre-expansion geometry, landing the row behind
             // the horizontal scrollbar.
+            if (flatTree != null)
+            {
+                flatTree.Flush();
+                flatTree.UpdateLayout();
+                flatTree.SelectedNode = item;
+                return;
+            }
+
             treeView.UpdateLayout();
 
             treeView.SelectedItem = item;
@@ -2260,7 +2342,7 @@ Recent ("));
 
         private TreeNode TryGetTreeNodeForFind()
         {
-            BaseNode node = treeView.SelectedItem as BaseNode;
+            BaseNode node = MainSelectedItem as BaseNode;
             if (node is Property or Metadata)
             {
                 node = node.Parent;
@@ -2426,7 +2508,7 @@ Recent ("));
         {
             ch = char.ToLowerInvariant(ch);
 
-            var selectedItem = treeView.SelectedItem as BaseNode;
+            var selectedItem = MainSelectedItem as BaseNode;
             if (selectedItem == null)
             {
                 return;
@@ -2538,7 +2620,7 @@ Recent ("));
 
         public void Delete()
         {
-            if (treeView.SelectedItem is TreeNode node)
+            if (MainSelectedItem is TreeNode node)
             {
                 MoveSelectionOut(node);
                 node.IsVisible = false;
@@ -2547,14 +2629,14 @@ Recent ("));
 
         public void Copy()
         {
-            if (ActiveTreeView?.SelectedItem is BaseNode node)
+            if (SelectedOf(ActiveTreeView) is BaseNode node)
             {
                 var text = node.GetFullText();
                 CopyToClipboard(text);
             }
         }
 
-        public void CopySubtree(TreeView tree = null, bool visibleOnly = false)
+        public void CopySubtree(Control tree = null, bool visibleOnly = false)
         {
             tree = tree ?? ActiveTreeView;
             if (tree == null)
@@ -2562,7 +2644,7 @@ Recent ("));
                 return;
             }
 
-            if (tree.SelectedItem is BaseNode treeNode)
+            if (SelectedOf(tree) is BaseNode treeNode)
             {
                 var text = Microsoft.Build.Logging.StructuredLogger.StringWriter.GetString(treeNode, visibleOnly);
                 CopyToClipboard(text);
@@ -2571,7 +2653,7 @@ Recent ("));
 
         public void ViewSubtreeText()
         {
-            if (treeView.SelectedItem is BaseNode treeNode)
+            if (MainSelectedItem is BaseNode treeNode)
             {
                 var text = Microsoft.Build.Logging.StructuredLogger.StringWriter.GetString(treeNode);
                 DisplayText(text, treeNode.ToString());
@@ -2580,7 +2662,7 @@ Recent ("));
 
         public void ShowTimeAndDuration()
         {
-            if (treeView.SelectedItem is TimedNode timedNode)
+            if (MainSelectedItem is TimedNode timedNode)
             {
                 var text = timedNode.GetTimeAndDurationText(fullPrecision: true);
                 DisplayText(text, timedNode.ToString());
@@ -2591,7 +2673,7 @@ Recent ("));
 
         public void AddToFavorites()
         {
-            var node = ActiveTreeView?.SelectedItem as BaseNode;
+            var node = SelectedOf(ActiveTreeView) as BaseNode;
             if (node != null)
             {
                 if (node is ProxyNode proxy)
@@ -2608,7 +2690,7 @@ Recent ("));
 
         public void RemoveFromFavorites()
         {
-            var node = ActiveTreeView?.SelectedItem as BaseNode;
+            var node = SelectedOf(ActiveTreeView) as BaseNode;
             if (node != null)
             {
                 if (node is ProxyNode proxy)
@@ -2698,7 +2780,7 @@ Recent ("));
 
         public void OpenFile()
         {
-            if (treeView.SelectedItem is Import import)
+            if (MainSelectedItem is Import import)
             {
                 DisplayFile(import.ImportedProjectFilePath, evaluation: import.GetNearestParent<ProjectEvaluation>());
             }
@@ -2707,11 +2789,11 @@ Recent ("));
         public void CopyFilePath()
         {
             string toCopy = null;
-            if (treeView.SelectedItem is Import import)
+            if (MainSelectedItem is Import import)
             {
                 toCopy = import.ImportedProjectFilePath;
             }
-            else if (treeView.SelectedItem is IHasSourceFile file)
+            else if (MainSelectedItem is IHasSourceFile file)
             {
                 toCopy = file.SourceFilePath;
             }
@@ -2724,7 +2806,7 @@ Recent ("));
 
         public void ShowFileInExplorer()
         {
-            string path = FileExplorerHelper.GetFilePathFromNode(treeView.SelectedItem as BaseNode);
+            string path = FileExplorerHelper.GetFilePathFromNode(MainSelectedItem as BaseNode);
 
             if (path != null)
             {
@@ -2734,12 +2816,12 @@ Recent ("));
 
         private bool CanShowInExplorer()
         {
-            return FileExplorerHelper.GetFilePathFromNode(treeView.SelectedItem as BaseNode) is not null;
+            return FileExplorerHelper.GetFilePathFromNode(MainSelectedItem as BaseNode) is not null;
         }
 
         public void ViewProperty()
         {
-            var selectedItem = treeView.SelectedItem;
+            var selectedItem = MainSelectedItem;
             if (selectedItem is Property property)
             {
                 SearchForProperty(property.Name);
@@ -2758,7 +2840,7 @@ Recent ("));
 
         public void SearchInSubtree()
         {
-            if (treeView.SelectedItem is TimedNode treeNode)
+            if (MainSelectedItem is TimedNode treeNode)
             {
                 searchLogControl.SearchText += $" under(${treeNode.Index})";
                 SelectSearchTab();
@@ -2767,7 +2849,7 @@ Recent ("));
 
         public void SearchInNodeByName()
         {
-            if (treeView.SelectedItem is TimedNode treeNode)
+            if (MainSelectedItem is TimedNode treeNode)
             {
                 if (treeNode is Project)
                 {
@@ -2784,7 +2866,7 @@ Recent ("));
 
         public void SearchThisNode()
         {
-            if (treeView.SelectedItem is SearchableItem searchNode)
+            if (MainSelectedItem is SearchableItem searchNode)
             {
                 searchLogControl.SearchText = searchNode.SearchText;
                 SelectSearchTab();
@@ -2793,7 +2875,7 @@ Recent ("));
 
         public void ExcludeSubtreeFromSearch()
         {
-            if (treeView.SelectedItem is TimedNode treeNode)
+            if (MainSelectedItem is TimedNode treeNode)
             {
                 searchLogControl.SearchText += $" notunder(${treeNode.Index})";
                 SelectSearchTab();
@@ -2802,7 +2884,7 @@ Recent ("));
 
         public void ExcludeNodeByNameFromSearch()
         {
-            if (treeView.SelectedItem is NamedNode treeNode)
+            if (MainSelectedItem is NamedNode treeNode)
             {
                 searchLogControl.SearchText += $" notunder(${treeNode.TypeName} {treeNode.Name})";
                 SelectSearchTab();
@@ -2811,7 +2893,7 @@ Recent ("));
 
         public void SearchInclusiveWithinThisTimespan()
         {
-            if (treeView.SelectedItem is TimedNode timedNode)
+            if (MainSelectedItem is TimedNode timedNode)
             {
                 DateTime starTime = timedNode.StartTime;
                 DateTime endTime = timedNode.EndTime;
@@ -2822,7 +2904,7 @@ Recent ("));
 
         public void SearchExclusiveWithinThisTimespan()
         {
-            if (treeView.SelectedItem is TimedNode timedNode)
+            if (MainSelectedItem is TimedNode timedNode)
             {
                 DateTime starTime = timedNode.StartTime;
                 DateTime endTime = timedNode.EndTime;
@@ -2833,7 +2915,7 @@ Recent ("));
 
         public void CopyChildren()
         {
-            if (treeView.SelectedItem is TreeNode node && node.HasChildren)
+            if (MainSelectedItem is TreeNode node && node.HasChildren)
             {
                 var children = node.Children.Select(c => c.GetFullText());
                 var text = string.Join(Environment.NewLine, children);
@@ -2843,7 +2925,7 @@ Recent ("));
 
         public void SortChildrenByName()
         {
-            var selectedItem = treeView.SelectedItem;
+            var selectedItem = MainSelectedItem;
             if (selectedItem is TreeNode treeNode)
             {
                 treeNode.SortChildren();
@@ -2852,7 +2934,7 @@ Recent ("));
 
         public void SortChildrenByDuration()
         {
-            var selectedItem = treeView.SelectedItem;
+            var selectedItem = MainSelectedItem;
             if (selectedItem is TreeNode treeNode)
             {
                 treeNode.SortChildren(TreeNode.CompareByDuration);
@@ -2864,7 +2946,7 @@ Recent ("));
             IsFindVisible = !IsFindVisible;
         }
 
-        private void CopyAll(TreeView tree = null)
+        private void CopyAll(Control tree = null)
         {
             tree = tree ?? ActiveTreeView;
             if (tree == null)
@@ -2873,7 +2955,7 @@ Recent ("));
             }
 
             var sb = new StringBuilder();
-            foreach (var item in tree.Items.OfType<BaseNode>())
+            foreach (var item in ItemsOf(tree).OfType<BaseNode>())
             {
                 var text = Microsoft.Build.Logging.StructuredLogger.StringWriter.GetString(item);
                 sb.Append(text);
@@ -2891,7 +2973,7 @@ Recent ("));
             CopyToClipboard(sb.ToString());
         }
 
-        private void CopyPaths(TreeView tree = null)
+        private void CopyPaths(Control tree = null)
         {
             tree = tree ?? ActiveTreeView;
             if (tree == null)
@@ -2900,7 +2982,7 @@ Recent ("));
             }
 
             var sb = new StringBuilder();
-            foreach (var item in tree.Items.OfType<TreeNode>())
+            foreach (var item in ItemsOf(tree).OfType<TreeNode>())
             {
                 item.VisitAllChildren<BaseNode>(s =>
                 {
@@ -2934,7 +3016,7 @@ Recent ("));
 
         public void CopyName()
         {
-            var nameValueNode = treeView.SelectedItem as NameValueNode;
+            var nameValueNode = MainSelectedItem as NameValueNode;
             if (nameValueNode != null)
             {
                 CopyToClipboard(nameValueNode.Name);
@@ -2943,7 +3025,7 @@ Recent ("));
 
         public void CopyValue()
         {
-            var nameValueNode = treeView.SelectedItem as NameValueNode;
+            var nameValueNode = MainSelectedItem as NameValueNode;
             if (nameValueNode != null)
             {
                 CopyToClipboard(nameValueNode.Value);

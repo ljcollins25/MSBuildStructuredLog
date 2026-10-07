@@ -930,6 +930,11 @@
                                       Margin="10,0,10,10"
                                       IsChecked="{Binding ParentAllTargetsUnderProject}"
                                       ToolTip.Tip="Linearize/flatten all targets under the project instead of parenting targets under their dependency target"/>-->
+                            <CheckBox Content="Virtualized tree"
+                                      Name="virtualizedTreeCheckBox"
+                                      Margin="10,0,10,10"
+                                      IsChecked="{Binding VirtualizedTree}"
+                                      ToolTip.Tip="Show the log tree as a flat virtualized list: expanding a node with tens of thousands of children is instant and uses little memory. Takes effect for the next opened log."/>
                             <CheckBox Content="Mark search results with a dot in the main tree"
                                       Margin="10,0,10,10"
                                       IsChecked="{Binding MarkResultsInTree}"
