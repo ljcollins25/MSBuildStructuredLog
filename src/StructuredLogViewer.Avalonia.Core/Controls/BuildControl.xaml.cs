@@ -114,6 +114,10 @@ namespace StructuredLogViewer.Avalonia.Controls
         private TabItem timelineTab;
         private TextBlock timelineWatermark;
         private TimelineControl timeline;
+        private TabItem tracingTab;
+        private TextBlock tracingWatermark;
+        private TracingControl tracing;
+        private MenuItem goToTracingItem;
         private MenuItem goToTimeLineItem;
         private MenuItem gotoMenuGroup;
         private ListBox breadCrumb;
@@ -306,6 +310,8 @@ namespace StructuredLogViewer.Avalonia.Controls
             gotoMenuGroup = new MenuItem() { Header = "Go to" };
             goToTimeLineItem = new MenuItem() { Header = "Timeline" };
             goToTimeLineItem.Click += (s, a) => GoToTimeLine();
+            goToTracingItem = new MenuItem() { Header = "Tracing" };
+            goToTracingItem.Click += (s, a) => GoToTracing();
             searchInclusiveWithinThisTimespan = new MenuItem() { Header = "Search overlapping this duration" };
             searchExclusiveWithinThisTimespan = new MenuItem() { Header = "Search within this duration" };
             favoriteItem = new MenuItem() { Header = "Add to Favorites" };
@@ -379,6 +385,7 @@ namespace StructuredLogViewer.Avalonia.Controls
             contextMenu.AddItem(showTimeItem);
             contextMenu.AddItem(gotoMenuGroup);
             gotoMenuGroup.AddItem(goToTimeLineItem);
+            gotoMenuGroup.AddItem(goToTracingItem);
 
             contextMenu.AddItem(separator1);
 
@@ -702,6 +709,7 @@ Right-clicking a project node may show the 'Preprocess' option if the version of
             documentWell.Dispose();
             centralTabControl.SelectionChanged -= CentralTabControl_SelectionChanged;
             timeline.Dispose();
+            tracing.Dispose();
 
             UnregisterTreeViewHandlers(treeView);
             UnregisterTreeViewHandlers(searchLogControl.ResultsList);
@@ -772,6 +780,7 @@ Right-clicking a project node may show the 'Preprocess' option if the version of
             excludeNodeByNameFromSearch = null;
             searchInclusiveWithinThisTimespan = null;
             goToTimeLineItem = null;
+            goToTracingItem = null;
             gotoMenuGroup = null;
             searchExclusiveWithinThisTimespan = null;
             copyChildrenItem = null;
@@ -959,6 +968,9 @@ Right-clicking a project node may show the 'Preprocess' option if the version of
             this.RegisterControl(out timelineTab, nameof(timelineTab));
             this.RegisterControl(out timelineWatermark, nameof(timelineWatermark));
             this.RegisterControl(out timeline, nameof(timeline));
+            this.RegisterControl(out tracingTab, nameof(tracingTab));
+            this.RegisterControl(out tracingWatermark, nameof(tracingWatermark));
+            this.RegisterControl(out tracing, nameof(tracing));
             centralTabControl.SelectionChanged += CentralTabControl_SelectionChanged;
             this.RegisterControl(out breadCrumb, nameof(breadCrumb));
             this.RegisterControl(out leftPaneTabControl, nameof(leftPaneTabControl));
@@ -1040,6 +1052,38 @@ Right-clicking a project node may show the 'Preprocess' option if the version of
             if (e.Source == centralTabControl && centralTabControl.SelectedItem == timelineTab)
             {
                 PopulateTimeline();
+            }
+            else if (e.Source == centralTabControl && centralTabControl.SelectedItem == tracingTab)
+            {
+                PopulateTrace();
+            }
+        }
+
+        private void PopulateTrace()
+        {
+            if (tracing.Timeline == null)
+            {
+                var start = DateTime.UtcNow;
+                var timelineData = new Timeline(Build, analyzeCpp: true);
+                tracing.TimelineTime = DateTime.UtcNow - start;
+                tracing.BuildControl = this;
+                tracing.SetTimeline(timelineData, Build.StartTime.Ticks, Build.EndTime.Ticks);
+                tracingWatermark.IsVisible = false;
+                tracing.IsVisible = true;
+            }
+        }
+
+        public TracingControl TracingControl => tracing;
+
+        public void GoToTracing()
+        {
+            if (treeView.SelectedItem is TimedNode treeNode)
+            {
+                centralTabControl.SelectedItem = tracingTab;
+                PopulateTrace();
+
+                // dispatch so the tab is laid out before computing the position to scroll to
+                Dispatcher.UIThread.InvokeAsync(() => tracing.GoToTimedNode(treeNode), DispatcherPriority.Background);
             }
         }
 
@@ -1377,6 +1421,7 @@ Recent ("));
             {
                 showTimeItem.IsVisible = true;
                 goToTimeLineItem.IsVisible = true;
+                goToTracingItem.IsVisible = true;
                 separator1.IsVisible = true;
                 searchInSubtreeItem.IsVisible = hasChildren;
                 excludeSubtreeFromSearchItem.IsVisible = hasChildren;
@@ -1400,6 +1445,7 @@ Recent ("));
                 separator1.IsVisible = false;
                 showTimeItem.IsVisible = false;
                 goToTimeLineItem.IsVisible = false;
+                goToTracingItem.IsVisible = false;
                 searchInSubtreeItem.IsVisible = false;
                 excludeSubtreeFromSearchItem.IsVisible = false;
                 excludeNodeByNameFromSearch.IsVisible = false;

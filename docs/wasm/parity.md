@@ -6,7 +6,7 @@ TextViewerControl and DocumentWell between the WPF and Avalonia code, plus the W
 The Avalonia column is the status of the shared UI; the browser column says works, or N/A with the reason. Effort: S hours, M a day, L several days.
 "to verify" means the code exists but is not yet exercised in the browser.
 
-Counts (Avalonia): present 51, partial 3, missing 10, N/A 1  (total 65)
+Counts (Avalonia): present 53, partial 2, missing 9, N/A 1  (total 65)
 
 | Area | Feature | Avalonia | Browser | Effort | Notes |
 |---|---|---|---|---|---|
@@ -39,7 +39,7 @@ Counts (Avalonia): present 51, partial 3, missing 10, N/A 1  (total 65)
 | Tabs | Find in Files | present | works | - |  |
 | Tabs | Favorites | present | works (in memory) | S | persist in localStorage? |
 | Tabs | Timeline | present | works | - | ported, bb90a59e6 |
-| Tabs | Tracing (zoom, scroll, selection) | missing | works once ported | L | TracingControl.xaml.cs 1490 lines, FastCanvas |
+| Tabs | Tracing (zoom, scroll, selection) | present | works | - | ported: single-surface renderer, heat graph, ruler, drag pan, Ctrl+wheel/slider zoom, click/double-click, P2P lines, display toggles menu. Touch gestures not ported (pointer events cover touch taps) |
 | Tabs | Project References graph | missing | works once ported | L | MSAGL layout is managed; WPF GraphControl 868 + GraphHostControl 414 lines |
 | Tabs | Targets graph | missing | works once ported | L | shares the graph control |
 | Tabs | NuGet graph | missing | works once ported | M | shares the graph control |
@@ -53,7 +53,7 @@ Counts (Avalonia): present 51, partial 3, missing 10, N/A 1  (total 65)
 | Context menu | Copy, Copy subtree, Copy visible subtree, Copy file path, Copy children, Copy name, Copy value | present | works (clipboard checked) | - |  |
 | Context menu | Show in Explorer | present | N/A: shows a file in the OS shell | - | hidden |
 | Context menu | Show time and duration | present | works | - |  |
-| Context menu | Go to submenu (Timeline, Tracing) | partial | works | S | Avalonia has a flat 'Go to Timeline'; add Tracing, make it a submenu like WPF |
+| Context menu | Go to submenu (Timeline, Tracing; Target graph pending the graph views) | present | works | - | |
 | Context menu | Sort children by name/duration, Filter children (Ctrl+F), Hide | present | works | - |  |
 | Context menu | Target graph, Property graph, NuGet graph, 'View in target graph' | missing | works once ported | S | hooks into the graph tabs |
 | Context menu | Run / Debug a task | missing | N/A: runs MSBuild tasks with TaskRunner | - | desktop-only, needs TaskRunner |

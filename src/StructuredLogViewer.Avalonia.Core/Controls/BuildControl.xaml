@@ -90,6 +90,14 @@
                     <local:TimelineControl Name="timeline" IsVisible="False" />
                   </Grid>
                 </TabItem>
+
+                <TabItem Name="tracingTab" Header="Tracing">
+                  <Grid>
+                    <TextBlock Name="tracingWatermark" HorizontalAlignment="Center"
+                               VerticalAlignment="Center">Rendering tracing...</TextBlock>
+                    <local:TracingControl Name="tracing" IsVisible="False" />
+                  </Grid>
+                </TabItem>
               </TabControl>
             </local:SplitterPanel.FirstChild>
 

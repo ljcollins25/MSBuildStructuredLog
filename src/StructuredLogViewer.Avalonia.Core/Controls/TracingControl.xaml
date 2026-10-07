@@ -1,0 +1,26 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="StructuredLogViewer.Avalonia.Controls.TracingControl">
+  <Grid Background="Transparent">
+    <ScrollViewer x:Name="scrollViewer"
+                  HorizontalScrollBarVisibility="Auto"
+                  VerticalScrollBarVisibility="Auto">
+      <LayoutTransformControl x:Name="zoomHost" HorizontalAlignment="Left" VerticalAlignment="Top" />
+    </ScrollViewer>
+    <StackPanel Margin="0,0,30,30"
+                Orientation="Horizontal"
+                ToolTip.Tip="Ctrl+MouseWheel to Zoom"
+                HorizontalAlignment="Right"
+                VerticalAlignment="Bottom">
+      <Button x:Name="resetZoomButton"
+              Padding="2,0,2,0"
+              IsVisible="False">100%</Button>
+      <Slider x:Name="zoomSlider"
+              MinWidth="100"
+              MinHeight="30"
+              Minimum="0.1"
+              Maximum="4"
+              Value="1" />
+    </StackPanel>
+  </Grid>
+</UserControl>

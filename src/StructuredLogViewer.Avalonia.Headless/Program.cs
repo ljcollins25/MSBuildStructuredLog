@@ -90,7 +90,18 @@ namespace StructuredLogViewer.Avalonia
             Pump(1500);
             Save(window, Path.Combine(outDir, "desktop-4-timeline.png"));
             Console.WriteLine("timeline blocks: " + control.TimelineControl.TextBlocks.Count);
-            return control.searchLogControl.ResultsList.ItemCount > 0 ? 0 : 1;
+
+            control.SelectTree();
+            if (task != null)
+            {
+                control.SelectItem(task);
+                control.GoToTracing();
+            }
+
+            Pump(2000);
+            Save(window, Path.Combine(outDir, "desktop-5-tracing.png"));
+            Console.WriteLine("tracing blocks: " + control.TracingControl.BlockCount);
+            return control.searchLogControl.ResultsList.ItemCount > 0 && control.TracingControl.BlockCount > 0 ? 0 : 1;
         }
 
         private static void Pump(int milliseconds)
