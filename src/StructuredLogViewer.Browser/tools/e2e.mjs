@@ -102,7 +102,7 @@ try {
     check(msg === '' && (await u.state()).loaded, 'server without Range support: opens with one download');
     await u.page.close();
     const v2 = await visit(context, url);
-    await v2.until(s => s.status !== undefined, 'the app to start', 120000);
+    await v2.until(s => !!s.status, 'the app to start', 120000);
     otherLog.length = 0;
     msg = await v2.page.evaluate(a => globalThis.binlogBrowser.OpenUrl(a), otherOrigin + '/cors.binlog');
     check(msg === '' && (await v2.state()).loaded, 'cross-origin URL with CORS and Range opens: ' + msg);

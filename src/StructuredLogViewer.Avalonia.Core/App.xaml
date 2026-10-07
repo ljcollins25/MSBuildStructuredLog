@@ -772,6 +772,7 @@
                                    FontSize="16"
                                    Foreground="Red"
                                    Margin="10"
+                                   MaxWidth="520"
                                    TextWrapping="Wrap"
                                    IsVisible="{Binding Message, Converter={StaticResource StringEmptinessToVisibilityConverter}, ConverterParameter=Invert}"
                                    Text="{Binding Message}" />

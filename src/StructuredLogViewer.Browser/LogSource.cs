@@ -80,9 +80,9 @@ namespace StructuredLogViewer.Browser
     /// <summary>fetch()-based source. Uses Range requests when the server supports them, a single download otherwise.</summary>
     internal sealed class HttpLogSourceProvider : ILogSourceProvider
     {
-        public const string CorsMessage = "Could not download the URL. Most likely the server does not allow cross-origin requests: " +
-            "it must send Access-Control-Allow-Origin (and for Range requests Access-Control-Allow-Headers: Range and Access-Control-Expose-Headers: Content-Range). " +
-            "It could also be a network error or a blocked mixed-content (http from https) request.";
+        public const string CorsMessage = "Could not download the URL, most likely because the server does not allow cross-origin requests (CORS). " +
+            "It must send Access-Control-Allow-Origin; for Range requests also Access-Control-Allow-Headers: Range and Access-Control-Expose-Headers: Content-Range. " +
+            "A network error or an http URL from an https page gives the same failure.";
 
         public async Task<ILogSource> OpenAsync(string url, CancellationToken cancellationToken = default)
         {
