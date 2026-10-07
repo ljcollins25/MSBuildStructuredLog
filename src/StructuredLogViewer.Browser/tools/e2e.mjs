@@ -223,6 +223,13 @@ try {
     const dlText = dl ? fs.readFileSync(await dl.path(), 'utf8') : '';
     check(!!dl && dlText.length > 0 && dl.suggestedFilename() === path.basename(opened), 'Save downloads the file: ' + (dl?.suggestedFilename() ?? 'no download') + ' (' + dlText.length + ' chars)');
 
+    // File menu with a dropped (local) log: no Reload (nothing to re-fetch); Save Log As and Statistics work
+    check(await v.page.evaluate(() => globalThis.binlogBrowser.GetFileMenu()) === 'Save Log As,Statistics', 'File menu for a dropped log: ' + await v.page.evaluate(() => globalThis.binlogBrowser.GetFileMenu()));
+    await v.page.evaluate(() => globalThis.binlogBrowser.SaveLogAs());
+    const saved = await v.page.evaluate(() => globalThis.binlogLastDownload);
+    check(saved?.name === 'fixture.binlog' && saved.length === metrics.binlogBytes, 'Save Log As downloads the original bytes: ' + JSON.stringify(saved));
+    const statsName = await v.page.evaluate(() => globalThis.binlogBrowser.ShowStatistics());
+    check(/Statistics/.test(statsName), 'Statistics adds the Statistics node: ' + statsName);
     // ---- dark theme: live switch with a log open, then persisted in localStorage ----
     const lightLoaded = (await v.page.evaluate(() => globalThis.binlogBrowser.GetThemeInfo())).split('|');
     check(await v.page.evaluate(() => globalThis.binlogBrowser.SetDarkTheme(true)), 'dark theme switched on');
@@ -234,13 +241,6 @@ try {
     await v.until(s => s.status !== undefined, 'the app to restart', 120000);
     check(await v.page.evaluate(() => globalThis.binlogBrowser.GetDarkTheme()), 'dark theme restored after reload');
     await v.page.evaluate(() => globalThis.binlogBrowser.SetDarkTheme(false));
-    // File menu with a dropped (local) log: no Reload (nothing to re-fetch); Save Log As and Statistics work
-    check(await v.page.evaluate(() => globalThis.binlogBrowser.GetFileMenu()) === 'Save Log As,Statistics', 'File menu for a dropped log: ' + await v.page.evaluate(() => globalThis.binlogBrowser.GetFileMenu()));
-    await v.page.evaluate(() => globalThis.binlogBrowser.SaveLogAs());
-    const saved = await v.page.evaluate(() => globalThis.binlogLastDownload);
-    check(saved?.name === 'fixture.binlog' && saved.length === metrics.binlogBytes, 'Save Log As downloads the original bytes: ' + JSON.stringify(saved));
-    const statsName = await v.page.evaluate(() => globalThis.binlogBrowser.ShowStatistics());
-    check(/Statistics/.test(statsName), 'Statistics adds the Statistics node: ' + statsName);
     check(v.errors.length === 0, 'no console errors (drop)' + (v.errors.length ? ': ' + v.errors.slice(0, 3).join(' | ') : ''));
     check(v.failed.length === 0, 'no failed requests (drop)' + (v.failed.length ? ': ' + v.failed.slice(0, 3).join(' | ') : ''));
     await v.page.close();
