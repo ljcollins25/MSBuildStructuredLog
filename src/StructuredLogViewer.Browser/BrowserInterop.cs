@@ -12,6 +12,14 @@ namespace StructuredLogViewer.Browser
         [JSExport]
         public static Task OpenBytes(string name, byte[] bytes) => BrowserShell.Instance.OpenBytesAsync(name, bytes);
 
+        /// <summary>Types the URL into the start page's Open from URL box and runs it; returns the error shown ("" when it opened).</summary>
+        [JSExport]
+        public static async Task<string> OpenUrl(string url) => await BrowserShell.Instance.OpenUrlAsync(url);
+
+        /// <summary>Which start page controls are visible: "project,url,log" subset (smoke test).</summary>
+        [JSExport]
+        public static string WelcomeControls() => BrowserShell.Instance.WelcomeControlsVisible();
+
         /// <summary>Summary of the loaded log, for the smoke test.</summary>
         [JSExport]
         public static string GetState()

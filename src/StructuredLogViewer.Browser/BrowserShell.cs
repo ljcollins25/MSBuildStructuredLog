@@ -1,13 +1,16 @@
 using System;
 using System.IO;
+using System.Linq;
 using System.Threading.Tasks;
 using System.Web;
+using Task = System.Threading.Tasks.Task;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.Presenters;
 using Avalonia.Layout;
 using Avalonia.Media;
 using Avalonia.Threading;
+using Microsoft.Build.Logging.StructuredLogger;
 using StructuredLogViewer.Avalonia.Controls;
 
 namespace StructuredLogViewer.Browser
@@ -44,30 +47,63 @@ namespace StructuredLogViewer.Browser
             dock.Children.Add(bar);
             dock.Children.Add(content);
             Content = dock;
-            status.Text = "Open a .binlog (button, drag and drop, or ?url=...).";
+            status.Text = "Open a .binlog (button, drag and drop, URL, or ?url=...).";
+            ShowWelcome();
 
             Dispatcher.UIThread.Post(async () => await StartupAsync(), DispatcherPriority.Background);
+        }
+
+        private WelcomeScreen welcome;
+
+        /// <summary>The shared start page, with what a browser cannot do hidden and Open from URL added.</summary>
+        private void ShowWelcome(string message = "", string url = null)
+        {
+            welcome = new WelcomeScreen { ShowOpenProject = false, ShowOpenFromUrl = true, Message = message, Url = url };
+            welcome.OpenLogFileRequested += () => JsInterop.PickFile();
+            welcome.OpenUrlRequested += async u => await OpenUrlAsync(u);
+            content.Content = welcome;
         }
 
         private async Task StartupAsync()
         {
             string url = HttpUtility.ParseQueryString(JsInterop.GetQuery())["url"];
-            if (string.IsNullOrEmpty(url))
+            if (!string.IsNullOrEmpty(url))
             {
-                return;
+                await OpenUrlAsync(url);
             }
+        }
 
+        /// <summary>Opens a log from a URL through the ILogSource seam; failures show on the start page. Returns the error or "".</summary>
+        public async Task<string> OpenUrlAsync(string url)
+        {
             try
             {
-                status.Text = "Downloading " + url + " ...";
-                byte[] bytes = await JsInterop.FetchBytesAsync(url);
-                await OpenBytesAsync(Path.GetFileName(new Uri(new Uri(JsInterop.GetHref()), url).AbsolutePath), bytes);
+                var source = await LogSources.Provider.OpenAsync(url);
+                status.Text = $"Downloading {source.Name}" + (source.Length is long n ? $" ({n / 1048576.0:N1} MB)" : "") +
+                    (source.SupportsRange ? " with Range requests" : "") + " ...";
+                byte[] bytes = await source.ReadAllAsync(new Progress<double>(p => status.Text = $"Downloading {source.Name}: {p:P0}"));
+                await OpenBytesAsync(source.Name, bytes);
+                return "";
             }
             catch (Exception ex)
             {
-                status.Text = "Could not load the URL: " + ex.Message;
+                string message = ex is LogSourceException ? ex.Message : "Could not open the URL: " + ex.Message;
+                status.Text = message;
                 JsInterop.Report("ERROR " + ex);
+                if (buildControl == null)
+                {
+                    ShowWelcome(message, url);
+                }
+
+                return message;
             }
+        }
+
+        public string WelcomeControlsVisible()
+        {
+            return Dispatcher.UIThread.Invoke(() => string.Join(",", System.Linq.Enumerable.Select(System.Linq.Enumerable.Where(
+                global::Avalonia.VisualTree.VisualExtensions.GetVisualDescendants(this).OfType<Control>(),
+                c => c.IsEffectivelyVisible && (c.Name == "openFromUrl" || c.Name == "openUrlButton" || c.Name == "urlText" || (c is Button b && b.Command == welcome?.OpenProjectCommand))), c => c.Name ?? "openProject")));
         }
 
         public async Task OpenBytesAsync(string name, byte[] bytes)

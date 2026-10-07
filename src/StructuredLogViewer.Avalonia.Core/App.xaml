@@ -777,10 +777,43 @@
                                    Text="{Binding Message}" />
                         <Grid Name="openLogOrProjectCompartment"
                               Grid.Row="1"
+                              RowDefinitions="Auto,Auto"
                               ColumnDefinitions="Auto,Auto">
+                            <StackPanel Name="openFromUrl"
+                                        Grid.Row="1"
+                                        Grid.ColumnSpan="2"
+                                        Margin="20,0,20,20"
+                                        IsVisible="{Binding ShowOpenFromUrl}">
+                                <TextBlock Text="Open from URL"
+                                           FontSize="16"
+                                           Margin="0,0,0,6" />
+                                <DockPanel>
+                                    <Button Name="openUrlButton"
+                                            DockPanel.Dock="Right"
+                                            Content="Open"
+                                            Margin="6,0,0,0"
+                                            Command="{Binding OpenUrlCommand}" />
+                                    <TextBox Name="urlText"
+                                             MinWidth="360"
+                                             Watermark="https://example.com/build.binlog"
+                                             Text="{Binding Url}">
+                                        <TextBox.KeyBindings>
+                                            <KeyBinding Gesture="Enter"
+                                                        Command="{Binding OpenUrlCommand}" />
+                                        </TextBox.KeyBindings>
+                                    </TextBox>
+                                </DockPanel>
+                                <TextBlock Text="The server must allow cross-origin requests (CORS); a log is read with HTTP Range requests when it supports them."
+                                           Foreground="Gray"
+                                           FontSize="12"
+                                           Margin="0,6,0,0"
+                                           TextWrapping="Wrap"
+                                           MaxWidth="460" />
+                            </StackPanel>
                             <Button Margin="20"
                                     MinWidth="200"
                                     MinHeight="200"
+                                    IsVisible="{Binding ShowOpenProject}"
                                     Command="{Binding OpenProjectCommand}">
                                 <StackPanel>
                                     <Image Width="100"

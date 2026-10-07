@@ -6,6 +6,7 @@
 // Needs: npm ci && npx playwright install chromium.
 import fs from 'node:fs';
 import path from 'node:path';
+import http from 'node:http';
 import { chromium } from 'playwright';
 import { serve } from './serve.mjs';
 
@@ -31,6 +32,28 @@ server.server.on('request', (req, res) => {
     return origHandler(req, res);
 });
 const origin = 'http://127.0.0.1:' + server.port;
+// a second origin for cross-origin ?url= tests: /cors.binlog (CORS + Range), /nocors.binlog (no CORS headers), /page.html, /norange.binlog (CORS, ignores Range)
+const data = fs.readFileSync(binlog);
+const otherLog = [];
+const other = http.createServer((req, res) => {
+    const p = req.url.split('?')[0];
+    otherLog.push({ p, range: req.headers.range ?? '' });
+    const cors = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'Range', 'Access-Control-Expose-Headers': 'Content-Range, Content-Length', 'Access-Control-Allow-Methods': 'GET' };
+    if (req.method === 'OPTIONS') { res.writeHead(204, cors); return res.end(); }
+    if (p === '/page.html') { res.writeHead(200, { 'Content-Type': 'text/html', ...cors }); return res.end('<!doctype html><html><body>sign in</body></html>'); }
+    if (p === '/nocors.binlog') { res.writeHead(200, { 'Content-Type': 'application/octet-stream' }); return res.end(data); }
+    if (p === '/norange.binlog') { res.writeHead(200, { 'Content-Type': 'application/octet-stream', ...cors }); return res.end(data); }
+    if (p === '/cors.binlog') {
+        const m = /bytes=(\d+)-(\d*)/.exec(req.headers.range ?? '');
+        if (!m) { res.writeHead(200, { 'Content-Type': 'application/octet-stream', ...cors }); return res.end(data); }
+        const a = Number(m[1]), b = Math.min(m[2] ? Number(m[2]) : data.length - 1, data.length - 1);
+        res.writeHead(206, { 'Content-Type': 'application/octet-stream', 'Content-Range': `bytes ${a}-${b}/${data.length}`, ...cors });
+        return res.end(data.subarray(a, b + 1));
+    }
+    res.writeHead(404, cors); res.end('nope');
+});
+await new Promise(r => other.listen(0, '127.0.0.1', r));
+const otherOrigin = 'http://127.0.0.1:' + other.address().port;
 const url = origin + server.prefix + '/';
 const browser = await chromium.launch();
 const metrics = { site, prefix, binlogBytes: fs.statSync(binlog).size };
@@ -55,6 +78,36 @@ async function visit(context, address) {
 
 try {
     const context = await browser.newContext();
+
+    // ---- start page and Open from URL (failures first, on the start page) ----
+    const u = await visit(context, url);
+    await u.until(s => s.status !== undefined, 'the app to start', 120000);
+    await u.page.waitForTimeout(1500);
+    const controls = (await u.page.evaluate(() => globalThis.binlogBrowser.WelcomeControls())).split(',');
+    check(controls.includes('openFromUrl') && controls.includes('urlText') && !controls.includes('openProject'),
+        'start page: Open from URL shown, Open Project/Solution hidden (' + controls.join(',') + ')');
+    await u.page.screenshot({ path: path.join(path.dirname(path.resolve(opt.metrics || 'metrics.json')), 'e2e-0-start.png') });
+    const tryUrl = async address => u.page.evaluate(a => globalThis.binlogBrowser.OpenUrl(a), address);
+    let msg = await tryUrl(otherOrigin + '/nocors.binlog');
+    check(/cross-origin|CORS/i.test(msg), 'no CORS headers gives a CORS message: ' + msg.slice(0, 60));
+    await u.page.waitForTimeout(500);
+    await u.page.screenshot({ path: path.join(path.dirname(path.resolve(opt.metrics || 'metrics.json')), 'e2e-0b-start-error.png') });
+    msg = await tryUrl(otherOrigin + '/page.html');
+    check(/web page/i.test(msg), 'an HTML response gives a not-a-binlog message: ' + msg.slice(0, 60));
+    msg = await tryUrl(otherOrigin + '/missing.binlog');
+    check(/HTTP 404/.test(msg), 'a 404 is reported: ' + msg.slice(0, 60));
+    msg = await tryUrl('ftp://x/y.binlog');
+    check(/http and https/.test(msg), 'non-http URL refused');
+    msg = await tryUrl(otherOrigin + '/norange.binlog');
+    check(msg === '' && (await u.state()).loaded, 'server without Range support: opens with one download');
+    await u.page.close();
+    const v2 = await visit(context, url);
+    await v2.until(s => s.status !== undefined, 'the app to start', 120000);
+    otherLog.length = 0;
+    msg = await v2.page.evaluate(a => globalThis.binlogBrowser.OpenUrl(a), otherOrigin + '/cors.binlog');
+    check(msg === '' && (await v2.state()).loaded, 'cross-origin URL with CORS and Range opens: ' + msg);
+    check(otherLog.some(r => /^bytes=0-/.test(r.range)) && otherLog.filter(r => r.p === '/cors.binlog' && r.range).length >= 1, 'it was fetched with Range requests (' + otherLog.filter(r => r.range).length + ')');
+    await v2.page.close();
 
     // ---- drag and drop ----
     const v = await visit(context, url);
@@ -151,6 +204,7 @@ try {
 } finally {
     await browser.close();
     server.server.close();
+    other.close();
 }
 metrics.passed = failures.length === 0;
 console.log(JSON.stringify(metrics, null, 2));

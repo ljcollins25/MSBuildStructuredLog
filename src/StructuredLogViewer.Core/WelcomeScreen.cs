@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -23,6 +23,33 @@ namespace Microsoft.Build.Logging.StructuredLogger
         public event Action<string> RecentProjectSelected;
         public event Action OpenProjectRequested;
         public event Action OpenLogFileRequested;
+        public event Action<string> OpenUrlRequested;
+
+        /// <summary>False where building a project is impossible (the browser): hides Open Project/Solution.</summary>
+        private bool showOpenProject = true;
+        public bool ShowOpenProject
+        {
+            get => showOpenProject;
+            set => SetField(ref showOpenProject, value);
+        }
+
+        /// <summary>True in the browser: shows the Open from URL box.</summary>
+        private bool showOpenFromUrl;
+        public bool ShowOpenFromUrl
+        {
+            get => showOpenFromUrl;
+            set => SetField(ref showOpenFromUrl, value);
+        }
+
+        private string url;
+        public string Url
+        {
+            get => url;
+            set => SetField(ref url, value);
+        }
+
+        private ICommand openUrlCommand;
+        public ICommand OpenUrlCommand => openUrlCommand ?? (openUrlCommand = new Command(() => OpenUrlRequested?.Invoke(Url)));
 
         private string version = GetVersion();
         public string Version

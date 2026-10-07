@@ -31,13 +31,37 @@ namespace StructuredLogViewer.Browser
         [JSImport("pickFile", Module)]
         public static partial void PickFile();
 
-        [JSImport("fetchBytes", Module)]
-        private static partial Task<JSObject> FetchBytes(string url);
+        [JSImport("fetchRange", Module)]
+        private static partial Task<JSObject> FetchRange(string url, double start, double end);
 
-        public static async Task<byte[]> FetchBytesAsync(string url)
+        public sealed class FetchResult
         {
-            using var result = await FetchBytes(url);
-            return result.GetPropertyAsByteArray("bytes");
+            public int Status;
+            public byte[] Bytes;
+            public long Total;
+            public string ContentType;
+        }
+
+        /// <summary>start &lt; 0 sends no Range header. Throws JsNetworkException when fetch itself fails (CORS or network).</summary>
+        public static async Task<FetchResult> FetchRangeAsync(string url, double start, double end)
+        {
+            try
+            {
+                using var result = await FetchRange(url, start, end);
+                return new FetchResult
+                {
+                    Status = result.GetPropertyAsInt32("status"),
+                    Bytes = result.GetPropertyAsByteArray("bytes"),
+                    Total = (long)result.GetPropertyAsDouble("total"),
+                    ContentType = result.GetPropertyAsString("contentType"),
+                };
+            }
+            catch (JSException ex) when (ex.Message.Contains("NETWORK"))
+            {
+                throw new JsNetworkException();
+            }
         }
     }
+
+    internal sealed class JsNetworkException : System.Exception { }
 }
