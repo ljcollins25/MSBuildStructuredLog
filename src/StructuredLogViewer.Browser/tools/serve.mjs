@@ -1,7 +1,7 @@
 // Static server that behaves like GitHub Pages under a subpath: the site lives at <prefix>/, text
 // files are gzipped on the fly, binaries and .br files are sent as is (no Content-Encoding), and
 // everything gets max-age=600. Used by e2e.mjs; also handy by hand:
-//   node tools/serve.mjs <siteDir> [port] [prefix]      (default 8080, /webbox/ilspy)
+//   node tools/serve.mjs <siteDir> [port] [prefix]      (default 8080, /webbox/binlog)
 import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -11,7 +11,7 @@ import { fileURLToPath } from 'node:url';
 const types = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.mjs': 'text/javascript; charset=utf-8', '.css': 'text/css', '.json': 'application/json', '.wasm': 'application/wasm', '.map': 'application/json', '.txt': 'text/plain' };
 const gzipped = new Set(['.html', '.js', '.mjs', '.css', '.json', '.txt', '.map']);
 
-export function serve(root, port = 0, prefix = '/webbox/ilspy') {
+export function serve(root, port = 0, prefix = '/webbox/binlog') {
     root = path.resolve(root);
     prefix = '/' + prefix.replace(/^\/+|\/+$/g, '');
     const log = [];

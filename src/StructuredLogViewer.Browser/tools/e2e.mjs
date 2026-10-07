@@ -1,108 +1,104 @@
-// Headless-Chromium smoke test of a staged ILSpy.Browser site, served under a subpath like GitHub Pages.
-//   node tools/e2e.mjs <siteDir> [--prefix=/webbox/ilspy] [--metrics=<file.json>] [--fixture=<assembly.dll>]
-// Opens the page (it starts with a sample assembly), waits for the first decompiled text, drops a small
-// assembly onto the page (a synthetic HTML5 drop, like main.js expects from a real one), selects its type
-// with the keyboard and checks the decompiled C#. Records the download size, time to first decompile,
-// a warm reload, and console errors; exits 1 if anything fails. Needs: npm ci && npx playwright install chromium.
+// Headless-Chromium smoke test of a staged StructuredLogViewer.Browser site, served under a subpath like GitHub Pages.
+//   node tools/e2e.mjs <siteDir> <binlog> [--prefix=/webbox/binlog] [--metrics=<file.json>] [--source=<file name fragment>] [--target=<search text>]
+// Opens the page, drops a small binlog onto it (a synthetic HTML5 drop, like main.js expects from a real one), waits
+// for the tree, searches for a target, selects the first hit (node details), and opens an embedded source file.
+// Also loads the same log through ?url=. Records download size, load time, console errors; exits 1 on any failure.
+// Needs: npm ci && npx playwright install chromium.
 import fs from 'node:fs';
 import path from 'node:path';
-import { execFileSync } from 'node:child_process';
-import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright';
 import { serve } from './serve.mjs';
 
 const args = process.argv.slice(2);
-const site = path.resolve(args.find(a => !a.startsWith('--')) ?? '');
+const pos = args.filter(a => !a.startsWith('--'));
 const opt = Object.fromEntries(args.filter(a => a.startsWith('--')).map(a => { const [k, ...v] = a.slice(2).split('='); return [k, v.join('=')]; }));
-const here = path.dirname(fileURLToPath(import.meta.url));
-const prefix = opt.prefix || '/webbox/ilspy';
+const site = path.resolve(pos[0] ?? '');
+const binlog = path.resolve(pos[1] ?? '');
+const prefix = opt.prefix || '/webbox/binlog';
+const targetText = opt.target || 'CoreCompile';
+const sourceFragment = opt.source || '.csproj';
 if (!fs.existsSync(path.join(site, 'index.html'))) throw new Error('not a site folder: ' + site);
-
-let fixture = opt.fixture && path.resolve(opt.fixture);
-if (!fixture) {
-    execFileSync('dotnet', ['build', path.join(here, 'fixture'), '-c', 'Release', '-v:q', '-nologo'], { stdio: 'inherit' });
-    fixture = path.join(here, 'fixture/bin/Release/netstandard2.0/Fixture.dll');
-}
+if (!fs.existsSync(binlog)) throw new Error('binlog not found: ' + binlog);
 
 const failures = [];
 const check = (ok, what) => { console.log((ok ? 'ok   ' : 'FAIL ') + what); if (!ok) failures.push(what); };
 const server = await serve(site, 0, prefix);
-const url = 'http://127.0.0.1:' + server.port + server.prefix + '/';
+// the binlog is served next to the site so ?url= can fetch it (same origin, no CORS needed)
+const origHandler = server.server.listeners('request')[0];
+server.server.removeAllListeners('request');
+server.server.on('request', (req, res) => {
+    if (req.url.startsWith('/fixture.binlog')) { res.writeHead(200, { 'Content-Type': 'application/octet-stream' }); return res.end(fs.readFileSync(binlog)); }
+    return origHandler(req, res);
+});
+const origin = 'http://127.0.0.1:' + server.port;
+const url = origin + server.prefix + '/';
 const browser = await chromium.launch();
+const metrics = { site, prefix, binlogBytes: fs.statSync(binlog).size };
 
-async function visit(context, label) {
+async function visit(context, address) {
     const page = await context.newPage();
     await page.setViewportSize({ width: 1400, height: 900 });
     const errors = [], failed = [];
     page.on('console', m => { if (m.type() === 'error') errors.push(m.text()); });
     page.on('pageerror', e => errors.push('pageerror: ' + e.message));
     page.on('requestfailed', r => failed.push(r.url() + ' ' + (r.failure()?.errorText ?? '')));
-    const cdp = await context.newCDPSession(page);
-    await cdp.send('Network.enable');
-    let bytes = 0, requests = 0;
-    cdp.on('Network.loadingFinished', e => { bytes += e.encodedDataLength; requests++; });
-    const text = () => page.evaluate(() => globalThis.ilspyBrowser?.GetDecompiledText() ?? '');
-    const until = async (pred, what, ms = 120000) => {
+    const state = () => page.evaluate(() => JSON.parse(globalThis.binlogBrowser?.GetState() ?? '{}')).catch(() => ({}));
+    const until = async (pred, what, ms = 180000) => {
         const t = Date.now();
-        while (Date.now() - t < ms) { const v = await text().catch(() => ''); if (pred(v)) return v; await page.waitForTimeout(100); }
-        throw new Error('timeout waiting for ' + what);
+        while (Date.now() - t < ms) { const s = await state(); if (pred(s)) return s; await page.waitForTimeout(100); }
+        throw new Error('timeout waiting for ' + what + ' (last state: ' + JSON.stringify(await state()).slice(0, 300) + ')');
     };
     const t0 = Date.now();
-    await page.goto(url);
-    const first = await until(t => t.includes('ICSharpCode.Decompiler'), 'the first decompile (sample assembly)');
-    const firstMs = Date.now() - t0, firstBytes = bytes;
-    return { page, errors, failed, text, until, firstMs, firstBytes, first, totalBytes: () => bytes, requests: () => requests };
+    await page.goto(address);
+    return { page, errors, failed, state, until, t0 };
 }
 
-const metrics = { site, prefix };
 try {
-    // ---- cold ----
     const context = await browser.newContext();
-    const v = await visit(context, 'cold');
-    check(/\/\/ ICSharpCode\.Decompiler, Version=/.test(v.first), 'sample assembly decompiled on startup');
-    metrics.coldFirstDecompileMs = v.firstMs;
-    metrics.coldDownloadBytesToFirstDecompile = v.firstBytes;
 
-    // ---- drop an assembly ----
-    const b64 = fs.readFileSync(fixture).toString('base64');
+    // ---- drag and drop ----
+    const v = await visit(context, url);
+    await v.until(s => s.status !== undefined && s.status !== null, 'the app to start', 120000);
+    metrics.startMs = Date.now() - v.t0;
+    check((await v.state()).status.includes('50 MB'), 'the start page warns that big logs do not fit');
+    const b64 = fs.readFileSync(binlog).toString('base64');
+    const t1 = Date.now();
     await v.page.evaluate(async b64 => {
         const bytes = Uint8Array.from(atob(b64), c => c.charCodeAt(0));
         const dt = new DataTransfer();
-        dt.items.add(new File([bytes], 'Fixture.dll', { type: 'application/octet-stream' }));
+        dt.items.add(new File([bytes], 'fixture.binlog', { type: 'application/octet-stream' }));
         document.dispatchEvent(new DragEvent('drop', { dataTransfer: dt, bubbles: true, cancelable: true }));
     }, b64);
-    // ---- select its type: the tree is a canvas, so drive it with the keyboard ----
-    await v.page.waitForTimeout(3000);
-    await v.page.mouse.click(100, 60);                    // first assembly row: focuses the tree
-    await v.page.keyboard.press('End');                   // last row = Fixture
-    await v.page.keyboard.press('ArrowRight');            // expand
-    const t1 = Date.now();
-    // Fixture's children: Metadata, References, the global namespace "-", then Demo; Demo's child is Greeter.
-    for (let i = 0; i < 4; i++) await v.page.keyboard.press('ArrowDown');
-    await v.page.keyboard.press('ArrowRight');            // expand Demo
-    await v.page.keyboard.press('ArrowDown');             // select Greeter
-    const code = await v.until(t => /class Greeter/.test(t), 'the decompiled type', 30000).catch(() => v.text());
-    check(/class Greeter/.test(code) && /Hello\(string name\)/.test(code), 'selecting the type shows decompiled C# (class Greeter / Hello)');
-    metrics.dropToDecompiledTypeMs = Date.now() - t1;
-    metrics.decompiledSnippet = code.split('\n').filter(l => l.trim()).slice(0, 12).join('\n');
+    let s = await v.until(s => s.loaded, 'the binlog to load');
+    metrics.dropToTreeMs = Date.now() - t1;
+    check(s.loaded && /parsed in/.test(s.status), 'drop opens the binlog: ' + s.status);
+    check(s.files > 0, 'embedded source files found: ' + s.files);
+
+    // ---- search ----
+    s = JSON.parse(await v.page.evaluate(q => globalThis.binlogBrowser.SearchAndSelectFirst(q), targetText));
+    check(s.results > 0, `search for '${targetText}' returns results (${s.results})`);
+    check(s.selected && s.details.length > 0, 'selecting a hit shows node details: ' + (s.selected ?? '').slice(0, 60));
+
+    // ---- source file ----
+    s = JSON.parse(await v.page.evaluate(f => globalThis.binlogBrowser.OpenFirstSourceFile(f), sourceFragment));
+    check(!!s.openFile && s.fileText.length > 0, 'a source file from the archive opens: ' + s.openFile);
+    metrics.sourceSnippet = (s.fileText ?? '').slice(0, 200);
     await v.page.screenshot({ path: path.join(path.dirname(path.resolve(opt.metrics || 'metrics.json')), 'e2e-screenshot.png') });
-    metrics.coldTotalDownloadBytes = v.totalBytes();
-    metrics.coldRequests = v.requests();
-    check(v.errors.length === 0, 'no console errors (cold)' + (v.errors.length ? ': ' + v.errors.slice(0, 3).join(' | ') : ''));
-    check(v.failed.length === 0, 'no failed requests (cold)' + (v.failed.length ? ': ' + v.failed.slice(0, 3).join(' | ') : ''));
+    check(v.errors.length === 0, 'no console errors (drop)' + (v.errors.length ? ': ' + v.errors.slice(0, 3).join(' | ') : ''));
+    check(v.failed.length === 0, 'no failed requests (drop)' + (v.failed.length ? ': ' + v.failed.slice(0, 3).join(' | ') : ''));
     await v.page.close();
 
-    // ---- warm: same context (HTTP cache + Cache API of decoded binaries) ----
-    const w = await visit(context, 'warm');
-    metrics.warmFirstDecompileMs = w.firstMs;
-    metrics.warmDownloadBytesToFirstDecompile = w.firstBytes;
-    check(w.errors.length === 0, 'no console errors (warm)' + (w.errors.length ? ': ' + w.errors.slice(0, 3).join(' | ') : ''));
+    // ---- ?url= (warm: same context) ----
+    const w = await visit(context, url + '?url=' + encodeURIComponent(origin + '/fixture.binlog'));
+    const s2 = await w.until(s => s.loaded, 'the ?url= binlog to load');
+    metrics.urlWarmToTreeMs = Date.now() - w.t0;
+    check(s2.loaded, '?url= opens the binlog: ' + s2.status);
+    check(w.errors.length === 0, 'no console errors (?url=)' + (w.errors.length ? ': ' + w.errors.slice(0, 3).join(' | ') : ''));
     await w.page.close();
 
     const bad = server.log.filter(r => r.status >= 400);
-    metrics.httpErrors = bad.length;
     check(bad.length === 0, 'no 4xx responses' + (bad.length ? ': ' + bad.slice(0, 5).map(b => b.status + ' ' + b.path).join(', ') : ''));
-    check(server.log.every(r => r.path.startsWith(prefix + '/')), 'every request stays under ' + prefix + '/');
+    check(server.log.filter(r => !r.path.startsWith('/fixture.binlog')).every(r => r.path.startsWith(prefix + '/')), 'every site request stays under ' + prefix + '/');
 } catch (e) {
     check(false, String(e.stack ?? e));
 } finally {

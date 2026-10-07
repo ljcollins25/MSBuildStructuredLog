@@ -1,7 +1,7 @@
 {
-  "name": "ilspy-browser-tools",
+  "name": "binlog-browser-tools",
   "private": true,
-  "description": "Static-site staging and e2e smoke test for ILSpy.Browser (not shipped).",
+  "description": "Static-site staging and e2e smoke test for StructuredLogViewer.Browser (not shipped).",
   "type": "module",
   "scripts": {
     "stage": "node stage.mjs",
