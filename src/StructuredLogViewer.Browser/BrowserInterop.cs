@@ -10,6 +10,9 @@ namespace StructuredLogViewer.Browser
     public static partial class BrowserInterop
     {
         [JSExport]
+        public static Task OpenPendingFile(string name) => BrowserShell.Instance.OpenPendingFileAsync(name);
+
+        [JSExport]
         public static Task OpenBytes(string name, byte[] bytes) => BrowserShell.Instance.OpenBytesAsync(name, bytes);
 
         /// <summary>Summary of the loaded log, for the smoke test.</summary>

@@ -109,8 +109,8 @@ const api = exports.StructuredLogViewer.Browser.BrowserInterop;
 globalThis.binlogBrowser = api;
 
 globalThis.binlogOpenFile = async file => {
-    const bytes = new Uint8Array(await file.arrayBuffer());
-    await api.OpenBytes(file.name, bytes);
+    globalThis.binlogPendingFile = file;
+    await api.OpenPendingFile(file.name);
 };
 
 // Avalonia's browser backend has no drag and drop support, so handle the HTML5 events here.

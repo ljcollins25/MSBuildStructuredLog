@@ -31,6 +31,18 @@ namespace StructuredLogViewer.Browser
         [JSImport("pickFile", Module)]
         public static partial void PickFile();
 
+        [JSImport("openSourceUrl", Module)]
+        public static partial int OpenSourceUrl(string url);
+
+        [JSImport("openPendingSource", Module)]
+        public static partial int OpenPendingSource();
+
+        [JSImport("sourceLength", Module)]
+        public static partial double SourceLength(int id);
+
+        [JSImport("readSource", Module)]
+        public static partial byte[] ReadSource(int id, double position, double count);
+
         [JSImport("fetchBytes", Module)]
         private static partial Task<JSObject> FetchBytes(string url);
 

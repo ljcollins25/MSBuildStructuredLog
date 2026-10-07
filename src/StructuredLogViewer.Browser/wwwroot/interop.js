@@ -57,3 +57,46 @@ export function downloadText(name, text) {
     setTimeout(() => URL.revokeObjectURL(url), 10000);
     globalThis.binlogLastDownload = { name, length: text.length };
 }
+
+// Synchronous ranged reads for the paged reader: ReadBuild is synchronous, so the bytes must be available without await.
+// Main-thread synchronous XHR cannot use responseType 'arraybuffer', so the body is read as a binary string.
+const sources = new Map();
+let nextSource = 1;
+
+export function openSource(urlOrFile) {
+    const url = typeof urlOrFile === 'string' ? urlOrFile : URL.createObjectURL(urlOrFile);
+    return openSourceUrl(url);
+}
+
+export function openSourceUrl(url) {
+    const xhr = new XMLHttpRequest();
+    xhr.open('GET', url, false);
+    xhr.setRequestHeader('Range', 'bytes=0-0');
+    xhr.overrideMimeType('text/plain; charset=x-user-defined');
+    xhr.send();
+    let length = -1;
+    const cr = xhr.getResponseHeader('Content-Range');
+    if (xhr.status === 206 && cr) length = parseInt(cr.split('/')[1], 10);
+    else if (xhr.status === 200) length = xhr.responseText.length; // blob: URLs answer the whole body
+    const id = nextSource++;
+    sources.set(id, { url, length });
+    return id;
+}
+
+export function sourceLength(id) { return sources.get(id).length; }
+
+export function readSource(id, position, count) {
+    const s = sources.get(id);
+    const xhr = new XMLHttpRequest();
+    xhr.open('GET', s.url, false);
+    xhr.setRequestHeader('Range', 'bytes=' + position + '-' + (position + count - 1));
+    xhr.overrideMimeType('text/plain; charset=x-user-defined');
+    xhr.send();
+    const t = xhr.responseText;
+    const bytes = new Uint8Array(t.length);
+    for (let i = 0; i < t.length; i++) bytes[i] = t.charCodeAt(i) & 0xff;
+    return bytes;
+}
+
+export function pendingFile() { const f = globalThis.binlogPendingFile; return f ? f.name : ''; }
+export function openPendingSource() { return openSource(globalThis.binlogPendingFile); }
