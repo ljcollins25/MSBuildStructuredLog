@@ -27,13 +27,18 @@ export function pickFile() {
     input.click();
 }
 
-export async function fetchBytes(url) {
-    const response = await fetch(url);
-    if (!response.ok) {
-        throw new Error('HTTP ' + response.status + ' for ' + url);
+// start < 0: plain GET. end is inclusive. fetch() itself failing (CORS, network, mixed content) is reported as 'NETWORK'.
+export async function fetchRange(url, start, end) {
+    let response;
+    try {
+        response = await fetch(url, start >= 0 ? { headers: { Range: 'bytes=' + start + '-' + end } } : {});
+    } catch {
+        throw new Error('NETWORK');
     }
 
-    return { bytes: new Uint8Array(await response.arrayBuffer()) };
+    const bytes = new Uint8Array(await response.arrayBuffer());
+    const match = /\/(\d+)$/.exec(response.headers.get('Content-Range') || '');
+    return { status: response.status, bytes, total: match ? Number(match[1]) : -1, contentType: response.headers.get('Content-Type') || '' };
 }
 
 // localStorage, used by BrowserSettingsStore (null when the key is missing or storage is blocked)

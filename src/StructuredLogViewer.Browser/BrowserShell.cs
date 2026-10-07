@@ -1,13 +1,18 @@
 using System;
 using System.IO;
+using System.Linq;
 using System.Threading.Tasks;
 using System.Web;
+using Task = System.Threading.Tasks.Task;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.Presenters;
+using Avalonia.Input;
+using Avalonia.Interactivity;
 using Avalonia.Layout;
 using Avalonia.Media;
 using Avalonia.Threading;
+using Microsoft.Build.Logging.StructuredLogger;
 using StructuredLogViewer.Avalonia.Controls;
 
 namespace StructuredLogViewer.Browser
@@ -44,29 +49,90 @@ namespace StructuredLogViewer.Browser
             dock.Children.Add(bar);
             dock.Children.Add(content);
             Content = dock;
-            status.Text = "Open a .binlog (button, drag and drop, or ?url=...).";
+            // the desktop MainWindow's Ctrl+F / Ctrl+Shift+F; Ctrl+0 and Ctrl+wheel stay the browser's own page zoom
+            status.Text = "Open a .binlog (button, drag and drop, URL, or ?url=...).";
+            ShowWelcome();
 
             Dispatcher.UIThread.Post(async () => await StartupAsync(), DispatcherPriority.Background);
+        }
+
+        private WelcomeScreen welcome;
+
+        /// <summary>The shared start page, with what a browser cannot do hidden and Open from URL added.</summary>
+        private void ShowWelcome(string message = "", string url = null)
+        {
+            welcome = new WelcomeScreen { ShowOpenProject = false, ShowOpenFromUrl = true, Message = message, Url = url };
+            welcome.OpenLogFileRequested += () => JsInterop.PickFile();
+            welcome.OpenUrlRequested += async u => await OpenUrlAsync(u);
+            content.Content = welcome;
         }
 
         private async Task StartupAsync()
         {
             string url = HttpUtility.ParseQueryString(JsInterop.GetQuery())["url"];
-            if (string.IsNullOrEmpty(url))
+            if (!string.IsNullOrEmpty(url))
+            {
+                await OpenUrlAsync(url);
+            }
+        }
+
+        /// <summary>Opens a log from a URL through the ILogSource seam; failures show on the start page. Returns the error or "".</summary>
+        public async Task<string> OpenUrlAsync(string url)
+        {
+            try
+            {
+                var source = await LogSources.Provider.OpenAsync(url);
+                status.Text = $"Downloading {source.Name}" + (source.Length is long n ? $" ({n / 1048576.0:N1} MB)" : "") +
+                    (source.SupportsRange ? " with Range requests" : "") + " ...";
+                if (source.SupportsRange)
+                {
+                    // ranged server: parse straight from ranged reads, never holding the compressed log whole
+                    var abs = new Uri(new Uri(JsInterop.GetHref()), url).AbsoluteUri;
+                    await OpenSourceAsync(source.Name, JsPositionedSource.FromUrl(abs));
+                    return "";
+                }
+
+                byte[] bytes = await source.ReadAllAsync(new Progress<double>(p => status.Text = $"Downloading {source.Name}: {p:P0}"));
+                await OpenBytesAsync(source.Name, bytes);
+                return "";
+            }
+            catch (Exception ex)
+            {
+                string message = ex is LogSourceException ? ex.Message : "Could not open the URL: " + ex.Message;
+                status.Text = message;
+                JsInterop.Report("ERROR " + ex);
+                if (buildControl == null)
+                {
+                    ShowWelcome(message, url);
+                }
+
+                return message;
+            }
+        }
+
+        protected override void OnAttachedToVisualTree(VisualTreeAttachmentEventArgs e)
+        {
+            base.OnAttachedToVisualTree(e);
+            // on the TopLevel: with nothing focused, key events never pass through this control
+            TopLevel.GetTopLevel(this)?.AddHandler(KeyDownEvent, OnShortcut, RoutingStrategies.Tunnel);
+        }
+
+        private void OnShortcut(object sender, KeyEventArgs e)
+        {
+            if (buildControl == null || e.Key != Key.F)
             {
                 return;
             }
 
-            try
+            if (e.KeyModifiers == (KeyModifiers.Control | KeyModifiers.Shift))
             {
-                status.Text = "Downloading " + url + " ...";
-                var abs = new Uri(new Uri(JsInterop.GetHref()), url).AbsoluteUri;
-                await OpenSourceAsync(Path.GetFileName(new Uri(abs).AbsolutePath), JsPositionedSource.FromUrl(abs));
+                buildControl.SelectFindInFilesTab();
+                e.Handled = true;
             }
-            catch (Exception ex)
+            else if (e.KeyModifiers == KeyModifiers.Control)
             {
-                status.Text = "Could not load the URL: " + ex.Message;
-                JsInterop.Report("ERROR " + ex);
+                buildControl.FocusSearch();
+                e.Handled = true;
             }
         }
 
@@ -95,6 +161,12 @@ namespace StructuredLogViewer.Browser
                 status.Text = "Could not open " + name + ": " + ex.Message;
                 JsInterop.Report("ERROR " + ex);
             }
+
+        public string WelcomeControlsVisible()
+        {
+            return Dispatcher.UIThread.Invoke(() => string.Join(",", System.Linq.Enumerable.Select(System.Linq.Enumerable.Where(
+                global::Avalonia.VisualTree.VisualExtensions.GetVisualDescendants(this).OfType<Control>(),
+                c => c.IsEffectivelyVisible && (c.Name == "openFromUrl" || c.Name == "openUrlButton" || c.Name == "urlText" || (c is Button b && b.Command == welcome?.OpenProjectCommand))), c => c.Name ?? "openProject")));
         }
 
         public async Task OpenBytesAsync(string name, byte[] bytes)
