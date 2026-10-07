@@ -339,6 +339,19 @@ namespace StructuredLogViewer
             set => Set(ref enableTreeViewVirtualization, value);
         }
 
+        private static bool virtualizedTree = false;
+
+        /// <summary>Avalonia: show the main tree as a flat virtualized list instead of the TreeView.</summary>
+        public static bool VirtualizedTree
+        {
+            get => Get(ref virtualizedTree);
+
+            set => Set(ref virtualizedTree, value);
+        }
+
+        /// <summary>Default for the virtualized tree until a saved choice is read (the saved line always wins).</summary>
+        public static void SetDefaultVirtualizedTree(bool on) => virtualizedTree = on;
+
         private static bool markResultsInTree = false;
 
         public static bool MarkResultsInTree
@@ -457,6 +470,7 @@ namespace StructuredLogViewer
 
         const string Virtualization = "Virtualization=";
         const string MarkResultsInTreeSetting = "MarkResultsInTree=";
+        const string VirtualizedTreeSetting = "VirtualizedTree=";
         const string ShowConfigurationAndPlatformSetting = "ShowConfigurationAndPlatform=";
         const string UseDarkThemeSetting = "UseDarkTheme=";
         const string VSCodeHintDismissedSetting = "VSCodeHintDismissed=";
@@ -471,6 +485,7 @@ namespace StructuredLogViewer
             sb.AppendLine(Virtualization + enableTreeViewVirtualization.ToString());
             //sb.AppendLine(ParentAllTargetsUnderProjectSetting + parentAllTargetsUnderProject.ToString());
             sb.AppendLine(MarkResultsInTreeSetting + markResultsInTree.ToString());
+            sb.AppendLine(VirtualizedTreeSetting + virtualizedTree.ToString());
             sb.AppendLine(ShowConfigurationAndPlatformSetting + ShowConfigurationAndPlatform.ToString());
             if (useDarkThemeChosen)
             {
@@ -504,6 +519,7 @@ namespace StructuredLogViewer
                     ProcessLine(Virtualization, line, ref enableTreeViewVirtualization);
                     //ProcessLine(ParentAllTargetsUnderProjectSetting, line, ref parentAllTargetsUnderProject);
                     ProcessLine(MarkResultsInTreeSetting, line, ref markResultsInTree);
+                    ProcessLine(VirtualizedTreeSetting, line, ref virtualizedTree);
                     ProcessLine(ShowConfigurationAndPlatformSetting, line, ref ProjectOrEvaluationHelper.ShowConfigurationAndPlatform);
                     if (line.StartsWith(UseDarkThemeSetting))
                     {

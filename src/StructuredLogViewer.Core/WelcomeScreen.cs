@@ -144,6 +144,16 @@ namespace Microsoft.Build.Logging.StructuredLogger
             }
         }
 
+        public bool VirtualizedTree
+        {
+            get => SettingsService.VirtualizedTree;
+            set
+            {
+                SettingsService.VirtualizedTree = value;
+                RaisePropertyChanged();
+            }
+        }
+
         public bool MarkResultsInTree
         {
             get => SettingsService.MarkResultsInTree;
