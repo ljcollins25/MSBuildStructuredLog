@@ -130,6 +130,16 @@ try {
     await v.page.waitForTimeout(1500);
     await shot('e2e-1-tree.png');
 
+    // ---- shortcuts ----
+    await v.page.mouse.click(700, 450);
+    await v.page.keyboard.press('Control+Shift+F');
+    await v.page.waitForTimeout(500);
+    s = await v.state();
+    check(s.leftTab === 'findInFilesTab', 'Ctrl+Shift+F opens Find in Files: ' + s.leftTab);
+    await v.page.keyboard.press('Control+F');
+    await v.page.waitForTimeout(300);
+    await shot('e2e-1b-shortcut.png');
+
     // ---- search (typed into the shared search box) ----
     const results = await v.page.evaluate(q => globalThis.binlogBrowser.Search(q), targetText);
     check(results > 0, `search for '${targetText}' returns results (${results})`);

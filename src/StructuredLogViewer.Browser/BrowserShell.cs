@@ -7,6 +7,8 @@ using Task = System.Threading.Tasks.Task;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.Presenters;
+using Avalonia.Input;
+using Avalonia.Interactivity;
 using Avalonia.Layout;
 using Avalonia.Media;
 using Avalonia.Threading;
@@ -47,6 +49,8 @@ namespace StructuredLogViewer.Browser
             dock.Children.Add(bar);
             dock.Children.Add(content);
             Content = dock;
+            // the desktop MainWindow's Ctrl+F / Ctrl+Shift+F; Ctrl+0 and Ctrl+wheel stay the browser's own page zoom
+            AddHandler(KeyDownEvent, OnShortcut, RoutingStrategies.Tunnel);
             status.Text = "Open a .binlog (button, drag and drop, URL, or ?url=...).";
             ShowWelcome();
 
@@ -96,6 +100,25 @@ namespace StructuredLogViewer.Browser
                 }
 
                 return message;
+            }
+        }
+
+        private void OnShortcut(object sender, KeyEventArgs e)
+        {
+            if (buildControl == null || e.Key != Key.F)
+            {
+                return;
+            }
+
+            if (e.KeyModifiers == (KeyModifiers.Control | KeyModifiers.Shift))
+            {
+                buildControl.SelectFindInFilesTab();
+                e.Handled = true;
+            }
+            else if (e.KeyModifiers == KeyModifiers.Control)
+            {
+                buildControl.FocusSearch();
+                e.Handled = true;
             }
         }
 

@@ -36,7 +36,8 @@ namespace StructuredLogViewer.Browser
                 ",\"files\":" + doc.Files.Count +
                 ",\"searchText\":\"" + Esc(bc.SearchText) + "\"" +
                 ",\"selected\":\"" + Esc(bc.SelectedTreeViewItem?.DataContext?.ToString()) + "\"" +
-                ",\"searchResults\":" + bc.searchLogControl.ResultsList.ItemCount + "}";
+                ",\"searchResults\":" + bc.searchLogControl.ResultsList.ItemCount +
+                ",\"leftTab\":\"" + Esc(bc.SelectedLeftTabName) + "\"}";
         }
 
         /// <summary>Types the query into the real search box and waits for the results.</summary>

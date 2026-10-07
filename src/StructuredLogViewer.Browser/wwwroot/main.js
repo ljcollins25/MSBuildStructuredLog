@@ -113,6 +113,13 @@ globalThis.binlogOpenFile = async file => {
     await api.OpenBytes(file.name, bytes);
 };
 
+// Ctrl+F focuses the app's search box once a log is open (Avalonia handles the key; this only stops the browser's find bar)
+document.addEventListener('keydown', event => {
+    if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'f' && JSON.parse(api.GetState()).loaded) {
+        event.preventDefault();
+    }
+}, true);
+
 // Avalonia's browser backend has no drag and drop support, so handle the HTML5 events here.
 document.addEventListener('dragenter', event => event.preventDefault());
 document.addEventListener('dragover', event => {
