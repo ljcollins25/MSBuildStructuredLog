@@ -158,8 +158,6 @@ namespace Microsoft.Build.Logging.StructuredLogger
             }
             else
             {
-                var queue = new List<BuildEventArgs>();
-
                 int recordsRead = 0;
 
                 reader.OnBlobRead += OnBlobRead;
@@ -193,21 +191,17 @@ namespace Microsoft.Build.Logging.StructuredLogger
                         break;
                     }
 
-                    queue.Add(instance);
+                    Dispatch(instance);
 
                     if (progress != null && stopwatch.ElapsedMilliseconds > 200)
                     {
                         stopwatch.Restart();
                         var streamPosition = stream.Position;
                         double ratio = (double)streamPosition / streamLength;
-                        progress.Report(new ProgressUpdate { Ratio = ratio, BufferLength = queue.Count });
+                        progress.Report(new ProgressUpdate { Ratio = ratio, BufferLength = 0 });
                     }
                 }
 
-                foreach (var args in queue)
-                {
-                    Dispatch(args);
-                }
                 if (reader.FileFormatVersion >= 10)
                 {
                     var strings = reader.GetStrings();
