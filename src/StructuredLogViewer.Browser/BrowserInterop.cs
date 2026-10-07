@@ -57,6 +57,29 @@ namespace StructuredLogViewer.Browser
             });
         }
 
+        /// <summary>Selects (and so expands in the tree) the node with the most children; returns "count|title".</summary>
+        [JSExport]
+        public static async Task<string> SelectBiggestNode()
+        {
+            var shell = BrowserShell.Instance;
+            TreeNode best = null;
+            shell.Document.Build.VisitAllChildren<TreeNode>(n =>
+            {
+                if (n.HasChildren && (best == null || n.Children.Count > best.Children.Count))
+                {
+                    best = n;
+                }
+            });
+            if (best == null)
+            {
+                return "";
+            }
+
+            await Dispatcher.UIThread.InvokeAsync(() => shell.BuildControl.SelectItem(best));
+            await Task.Delay(1000);
+            return best.Children.Count + "|" + best.ToString();
+        }
+
         /// <summary>Selects the first Task whose name contains the text, like clicking it in the tree (details, breadcrumb).</summary>
         [JSExport]
         public static async Task<string> SelectFirstTask(string name)
