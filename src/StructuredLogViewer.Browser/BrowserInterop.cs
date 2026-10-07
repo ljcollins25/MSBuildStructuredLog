@@ -63,13 +63,27 @@ namespace StructuredLogViewer.Browser
         {
             var shell = BrowserShell.Instance;
             TreeNode best = null;
-            shell.Document.Build.VisitAllChildren<TreeNode>(n =>
+            // counts without realizing lazy children, and does not descend into them
+            void Walk(TreeNode n)
             {
-                if (n.HasChildren && (best == null || n.Children.Count > best.Children.Count))
+                if (best == null || n.ChildCount > best.ChildCount)
                 {
                     best = n;
                 }
-            });
+
+                if (n.HasChildren && !n.HasUnrealizedChildren)
+                {
+                    foreach (var child in n.Children)
+                    {
+                        if (child is TreeNode t)
+                        {
+                            Walk(t);
+                        }
+                    }
+                }
+            }
+
+            Walk(shell.Document.Build);
             if (best == null)
             {
                 return "";
@@ -77,7 +91,7 @@ namespace StructuredLogViewer.Browser
 
             await Dispatcher.UIThread.InvokeAsync(() => shell.BuildControl.SelectItem(best));
             await Task.Delay(1000);
-            return best.Children.Count + "|" + best.ToString();
+            return best.ChildCount + "|" + best.ToString();
         }
 
         /// <summary>Selects the first Task whose name contains the text, like clicking it in the tree (details, breadcrumb).</summary>
