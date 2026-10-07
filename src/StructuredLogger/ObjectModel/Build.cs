@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.IO.Compression;
@@ -131,10 +131,64 @@ namespace Microsoft.Build.Logging.StructuredLogger
 
         public static IReadOnlyList<ArchiveFile> ReadSourceFiles(byte[] sourceFilesArchive)
         {
-            using (var stream = new MemoryStream(sourceFilesArchive))
+            // only the zip directory is read here; each file is decompressed when its text is first asked for
+            var result = new List<ArchiveFile>();
+            try
             {
-                return ReadSourceFiles(stream);
+                var zipArchive = new ZipArchive(new MemoryStream(sourceFilesArchive, writable: false), ZipArchiveMode.Read);
+                var gate = new object();
+                var ignoreSubstrings = GetIgnoreSubstrings();
+                foreach (var entry in zipArchive.Entries)
+                {
+                    if (IsIgnored(entry.FullName, ignoreSubstrings))
+                    {
+                        continue;
+                    }
+
+                    var zipEntry = entry;
+                    result.Add(new ArchiveFile(ArchiveFile.CalculateArchivePath(entry.FullName), () =>
+                    {
+                        lock (gate)
+                        {
+                            try
+                            {
+                                return ArchiveFile.GetText(zipEntry);
+                            }
+                            catch
+                            {
+                                return "";
+                            }
+                        }
+                    }));
+                }
             }
+            catch
+            {
+                // The archive is likely incomplete (corrupt) because the build crashed.
+            }
+
+            return result;
+        }
+
+        private static string[] GetIgnoreSubstrings()
+        {
+            return string.IsNullOrWhiteSpace(IgnoreEmbeddedFiles) ? null : IgnoreEmbeddedFiles.Split(new[] { ';' }, StringSplitOptions.RemoveEmptyEntries);
+        }
+
+        private static bool IsIgnored(string name, string[] ignoreSubstrings)
+        {
+            if (ignoreSubstrings != null)
+            {
+                foreach (var substring in ignoreSubstrings)
+                {
+                    if (name.IndexOf(substring, StringComparison.OrdinalIgnoreCase) != -1)
+                    {
+                        return true;
+                    }
+                }
+            }
+
+            return false;
         }
 
         public static IReadOnlyList<ArchiveFile> ReadSourceFiles(string zipFullPath)

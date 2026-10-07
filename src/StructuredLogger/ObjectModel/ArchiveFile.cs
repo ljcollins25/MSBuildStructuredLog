@@ -1,4 +1,5 @@
-﻿using System.IO;
+using System;
+using System.IO;
 using System.IO.Compression;
 
 namespace Microsoft.Build.Logging.StructuredLogger
@@ -8,11 +9,25 @@ namespace Microsoft.Build.Logging.StructuredLogger
         public ArchiveFile(string fullPath, string text)
         {
             FullPath = fullPath;
-            Text = text;
+            this.text = text;
         }
 
+        /// <summary>An entry whose content is read (and decompressed) only when <see cref="Text"/> is asked for.</summary>
+        public ArchiveFile(string fullPath, Func<string> loadText)
+        {
+            FullPath = fullPath;
+            this.loadText = loadText;
+        }
+
+        private readonly string text;
+        private readonly Func<string> loadText;
+
         public string FullPath { get; }
-        public string Text { get; }
+
+        /// <summary>The content; for a lazy entry it is read on every call, so keep the result if it is needed again.</summary>
+        public string Text => text ?? loadText?.Invoke();
+
+        public bool IsLoaded => loadText == null;
 
         public static ArchiveFile From(ZipArchiveEntry entry)
             => From(entry, adjustPath: true);

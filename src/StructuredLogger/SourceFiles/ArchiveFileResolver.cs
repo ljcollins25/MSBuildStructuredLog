@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 
 namespace Microsoft.Build.Logging.StructuredLogger;
@@ -13,7 +13,7 @@ public class ArchiveFileResolver : ISourceFileResolver
     {
         foreach (var file in files)
         {
-            AddFile(file.FullPath, file.Text);
+            AddFile(file);
         }
     }
 
@@ -35,8 +35,8 @@ public class ArchiveFileResolver : ISourceFileResolver
         return result;
     }
 
-    private void AddFile(string fullName, string text)
+    private void AddFile(ArchiveFile file)
     {
-        fileContents[fullName] = new SourceText(text);
+        fileContents[file.FullPath] = file.IsLoaded ? new SourceText(file.Text) : new SourceText(() => file.Text);
     }
 }

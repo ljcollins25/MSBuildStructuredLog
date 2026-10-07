@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 
 namespace Microsoft.Build.Logging.StructuredLogger;
@@ -7,10 +7,37 @@ public class SourceText
 {
     public SourceText(string text)
     {
-        Text = text;
+        this.text = text;
     }
 
-    public string Text { get; }
+    /// <summary>The text is produced by <paramref name="load"/> the first time it is needed.</summary>
+    public SourceText(Func<string> load)
+    {
+        this.load = load;
+    }
+
+    private string text;
+    private Func<string> load;
+
+    public string Text
+    {
+        get
+        {
+            if (text == null && load != null)
+            {
+                lock (this)
+                {
+                    if (text == null)
+                    {
+                        text = load() ?? "";
+                        load = null;
+                    }
+                }
+            }
+
+            return text;
+        }
+    }
 
     private IReadOnlyList<Span> lines;
     public IReadOnlyList<Span> Lines
