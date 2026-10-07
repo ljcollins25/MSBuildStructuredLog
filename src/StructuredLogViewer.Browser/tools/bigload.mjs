@@ -56,6 +56,8 @@ async function step(name, fn) { const t = Date.now(); try { const r = await page
 if (state.loaded) {
   await step('search CoreCompile', () => globalThis.binlogBrowser.Search('CoreCompile'));
   await step('open embedded file', () => globalThis.binlogBrowser.OpenFirstSourceFile('.cs'));
+  await step('flat tree info', () => globalThis.binlogBrowser.TreeInfo());
+  await step('big node toggle (children|rows|realized|expandMs|collapseOk|reexpandMs)', () => globalThis.binlogBrowser.BigNodeToggle());
   await step('biggest node', () => globalThis.binlogBrowser.SelectBiggestNode());
 }
 await browser.close(); srv.close();

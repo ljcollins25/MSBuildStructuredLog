@@ -344,8 +344,28 @@ namespace StructuredLogViewer.Browser
         public static async Task<string> BigNodeToggle()
         {
             var shell = BrowserShell.Instance;
+            // counts without realizing the lazy items/properties of a big log (and without descending into them)
             TreeNode big = null;
-            shell.Document.Build.VisitAllChildren<TreeNode>(n => { if (big == null || n.Children.Count > big.Children.Count) big = n; });
+            void Walk(TreeNode n)
+            {
+                if (big == null || n.ChildCount > big.ChildCount)
+                {
+                    big = n;
+                }
+
+                if (n.HasChildren && !n.HasUnrealizedChildren)
+                {
+                    foreach (var child in n.Children)
+                    {
+                        if (child is TreeNode c)
+                        {
+                            Walk(c);
+                        }
+                    }
+                }
+            }
+
+            Walk(shell.Document.Build);
             var t = Flat;
             var sw = Stopwatch.StartNew();
             await Dispatcher.UIThread.InvokeAsync(() => shell.BuildControl.SelectItem(big));
@@ -364,7 +384,7 @@ namespace StructuredLogViewer.Browser
             sw.Restart();
             await Dispatcher.UIThread.InvokeAsync(() => big.IsExpanded = true);
             await Dispatcher.UIThread.InvokeAsync(() => { }, DispatcherPriority.Background);
-            return big.Children.Count + "|" + rows + "|" + realized + "|" + expandMs + "|" + (after == collapsedRows) + "|" + sw.ElapsedMilliseconds;
+            return big.ChildCount + "|" + rows + "|" + realized + "|" + expandMs + "|" + (after == collapsedRows) + "|" + sw.ElapsedMilliseconds;
         }
 
         /// <summary>Opens the first embedded source file whose path contains the filter in the shared text viewer.</summary>
