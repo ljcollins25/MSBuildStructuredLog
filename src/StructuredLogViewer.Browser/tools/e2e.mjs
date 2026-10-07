@@ -93,6 +93,12 @@ try {
     await v.page.waitForTimeout(1500);
     await shot('e2e-3-source.png');
 
+    // ---- timeline (shared TimelineControl) ----
+    const blocks = Number(await v.page.evaluate(() => globalThis.binlogBrowser.GoToTimeline('Csc')));
+    await v.page.waitForTimeout(800);
+    await shot('e2e-4-timeline.png');
+    check(blocks > 0, 'Timeline tab renders blocks: ' + blocks);
+
     // ---- shared-UI commands that need browser support ----
     const buttons = await v.page.evaluate(() => globalThis.binlogBrowser.VisibleViewerButtons());
     check(buttons.includes('save') && !buttons.includes('openInExternalEditor'), 'source toolbar: Save shown, Open in external editor hidden');

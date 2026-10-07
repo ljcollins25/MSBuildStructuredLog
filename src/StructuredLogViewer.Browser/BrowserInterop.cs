@@ -89,6 +89,26 @@ namespace StructuredLogViewer.Browser
                 b => b.IsEffectivelyVisible && !string.IsNullOrEmpty(b.Name)), b => b.Name)));
         }
 
+        /// <summary>Selects the first Task named like the text and runs Go to Timeline on it; returns "blocks|highlighted".</summary>
+        [JSExport]
+        public static async Task<string> GoToTimeline(string taskName)
+        {
+            var shell = BrowserShell.Instance;
+            var node = shell.Document.Build.FindFirstDescendant<Microsoft.Build.Logging.StructuredLogger.Task>(t => t.Name != null && t.Name.Contains(taskName));
+            if (node == null)
+            {
+                return "no task";
+            }
+
+            await Dispatcher.UIThread.InvokeAsync(() =>
+            {
+                shell.BuildControl.SelectItem(node);
+                shell.BuildControl.GoToTimeLine();
+            });
+            await Task.Delay(1000);
+            return await Dispatcher.UIThread.InvokeAsync(() => shell.BuildControl.TimelineControl.TextBlocks.Count.ToString());
+        }
+
         /// <summary>Switches the dark theme through SettingsService (persisted by the settings store).</summary>
         [JSExport]
         public static bool SetDarkTheme(bool dark)

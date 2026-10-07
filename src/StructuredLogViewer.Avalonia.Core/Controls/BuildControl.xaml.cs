@@ -111,6 +111,10 @@ namespace StructuredLogViewer.Avalonia.Controls
         private SearchAndResultsControl filesTree;
         private SearchAndResultsControl favoritesTree;
         private TabControl centralTabControl;
+        private TabItem timelineTab;
+        private TextBlock timelineWatermark;
+        private TimelineControl timeline;
+        private MenuItem goToTimeLineItem;
         private ListBox breadCrumb;
         private TabControl leftPaneTabControl;
         private TabItem searchLogTab;
@@ -298,6 +302,8 @@ namespace StructuredLogViewer.Avalonia.Controls
             searchThisNode = new MenuItem() { Header = "Search this node" };
             excludeSubtreeFromSearchItem = new MenuItem() { Header = "Exclude subtree from search" };
             excludeNodeByNameFromSearch = new MenuItem() { Header = "Exclude node from search" };
+            goToTimeLineItem = new MenuItem() { Header = "Go to Timeline" };
+            goToTimeLineItem.Click += (s, a) => GoToTimeLine();
             searchInclusiveWithinThisTimespan = new MenuItem() { Header = "Search overlapping this duration" };
             searchExclusiveWithinThisTimespan = new MenuItem() { Header = "Search within this duration" };
             favoriteItem = new MenuItem() { Header = "Add to Favorites" };
@@ -369,6 +375,7 @@ namespace StructuredLogViewer.Avalonia.Controls
 
             contextMenu.AddItem(viewSubtreeTextItem);
             contextMenu.AddItem(showTimeItem);
+            contextMenu.AddItem(goToTimeLineItem);
 
             contextMenu.AddItem(separator1);
 
@@ -690,6 +697,8 @@ Right-clicking a project node may show the 'Preprocess' option if the version of
         public void Dispose()
         {
             documentWell.Dispose();
+            centralTabControl.SelectionChanged -= CentralTabControl_SelectionChanged;
+            timeline.Dispose();
 
             UnregisterTreeViewHandlers(treeView);
             UnregisterTreeViewHandlers(searchLogControl.ResultsList);
@@ -759,6 +768,7 @@ Right-clicking a project node may show the 'Preprocess' option if the version of
             excludeSubtreeFromSearchItem = null;
             excludeNodeByNameFromSearch = null;
             searchInclusiveWithinThisTimespan = null;
+            goToTimeLineItem = null;
             searchExclusiveWithinThisTimespan = null;
             copyChildrenItem = null;
             sortChildrenByNameItem = null;
@@ -942,6 +952,10 @@ Right-clicking a project node may show the 'Preprocess' option if the version of
             this.RegisterControl(out filesTree, nameof(filesTree));
             this.RegisterControl(out favoritesTree, nameof(favoritesTree));
             this.RegisterControl(out centralTabControl, nameof(centralTabControl));
+            this.RegisterControl(out timelineTab, nameof(timelineTab));
+            this.RegisterControl(out timelineWatermark, nameof(timelineWatermark));
+            this.RegisterControl(out timeline, nameof(timeline));
+            centralTabControl.SelectionChanged += CentralTabControl_SelectionChanged;
             this.RegisterControl(out breadCrumb, nameof(breadCrumb));
             this.RegisterControl(out leftPaneTabControl, nameof(leftPaneTabControl));
             this.RegisterControl(out searchLogTab, nameof(searchLogTab));
@@ -1015,6 +1029,38 @@ Right-clicking a project node may show the 'Preprocess' option if the version of
             }
 
             return visible;
+        }
+
+        private void CentralTabControl_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (e.Source == centralTabControl && centralTabControl.SelectedItem == timelineTab)
+            {
+                PopulateTimeline();
+            }
+        }
+
+        private void PopulateTimeline()
+        {
+            if (timeline.Timeline == null)
+            {
+                var timelineData = new Timeline(Build, analyzeCpp: false);
+                timeline.BuildControl = this;
+                timeline.SetTimeline(timelineData, Build.StartTime.Ticks);
+                timelineWatermark.IsVisible = false;
+                timeline.IsVisible = true;
+            }
+        }
+
+        public TimelineControl TimelineControl => timeline;
+
+        public void GoToTimeLine()
+        {
+            if (treeView.SelectedItem is TimedNode treeNode)
+            {
+                centralTabControl.SelectedItem = timelineTab;
+                PopulateTimeline();
+                timeline.GoToTimedNode(treeNode);
+            }
         }
 
         public void SelectTree()
@@ -1326,6 +1372,7 @@ Recent ("));
             if (node is TimedNode timedNode)
             {
                 showTimeItem.IsVisible = true;
+                goToTimeLineItem.IsVisible = true;
                 separator1.IsVisible = true;
                 searchInSubtreeItem.IsVisible = hasChildren;
                 excludeSubtreeFromSearchItem.IsVisible = hasChildren;
@@ -1348,6 +1395,7 @@ Recent ("));
             {
                 separator1.IsVisible = false;
                 showTimeItem.IsVisible = false;
+                goToTimeLineItem.IsVisible = false;
                 searchInSubtreeItem.IsVisible = false;
                 excludeSubtreeFromSearchItem.IsVisible = false;
                 excludeNodeByNameFromSearch.IsVisible = false;

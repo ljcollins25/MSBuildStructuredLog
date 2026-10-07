@@ -83,10 +83,13 @@
                   </Grid>
                 </TabItem>
 
-                  <!--<TabItem Name="timelineTab"
-                            Header="Timeline">
-                      <local:TimelineControl Name="timeline" />
-                  </TabItem>-->
+                <TabItem Name="timelineTab" Header="Timeline">
+                  <Grid>
+                    <TextBlock Name="timelineWatermark" HorizontalAlignment="Center"
+                               VerticalAlignment="Center">Rendering timeline...</TextBlock>
+                    <local:TimelineControl Name="timeline" IsVisible="False" />
+                  </Grid>
+                </TabItem>
               </TabControl>
             </local:SplitterPanel.FirstChild>
 
