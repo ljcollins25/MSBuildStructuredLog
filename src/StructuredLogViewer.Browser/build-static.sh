@@ -29,7 +29,9 @@ cd "$here"
 
 pub="$here/bin/Release/publish-static"
 rm -rf "$pub"
-dotnet publish StructuredLogViewer.Browser.csproj -c Release -o "$pub"
+# PUBLISH_ARGS: extra msbuild args, e.g. PUBLISH_ARGS="-p:EmccMaximumHeapSize=2147483648" builds with a real 2 GB wasm heap maximum
+# (the maximum is fixed at build time by the linker; it cannot be lowered by the page at load)
+dotnet publish StructuredLogViewer.Browser.csproj -c Release -o "$pub" ${PUBLISH_ARGS:-}
 
 node tools/stage.mjs "$pub/wwwroot" "$out" --target="$target" ${stage_args[@]+"${stage_args[@]}"}
 echo "Static site ready: $out"
