@@ -40,6 +40,7 @@ namespace StructuredLogViewer.Avalonia
         private MenuItem RecentProjectsMenu;
         private MenuItem RecentLogsMenu;
         private MenuItem ReloadMenu;
+        private MenuItem OpenGraph;
         private MenuItem SaveAsMenu;
         private MenuItem RedactSecretsMenu;
         private MenuItem StatsMenu;
@@ -92,6 +93,7 @@ namespace StructuredLogViewer.Avalonia
             this.RegisterControl(out RecentProjectsMenu, nameof(RecentProjectsMenu));
             this.RegisterControl(out RecentLogsMenu, nameof(RecentLogsMenu));
             this.RegisterControl(out ReloadMenu, nameof(ReloadMenu));
+            this.RegisterControl(out OpenGraph, nameof(OpenGraph));
             this.RegisterControl(out SaveAsMenu, nameof(SaveAsMenu));
             this.RegisterControl(out RedactSecretsMenu, nameof(RedactSecretsMenu));
             this.RegisterControl(out StatsMenu, nameof(StatsMenu));
@@ -119,6 +121,7 @@ namespace StructuredLogViewer.Avalonia
             Build.Click += Build_Click;
             Rebuild.Click += Rebuild_Click;
             Open.Click += Open_Click;
+            OpenGraph.Click += OpenGraph_Click;
             ReloadMenu.Click += Reload_Click;
             SaveAsMenu.Click += SaveAs_Click;
             RedactSecretsMenu.Click += RedactSecrets_Click;
@@ -390,6 +393,14 @@ namespace StructuredLogViewer.Avalonia
                 filePath.EndsWith(".binlog", StringComparison.OrdinalIgnoreCase))
             {
                 OpenLogFile(filePath);
+                return true;
+            }
+
+            if (filePath.EndsWith(".dgml", StringComparison.OrdinalIgnoreCase) ||
+                filePath.EndsWith(".graph", StringComparison.OrdinalIgnoreCase) ||
+                filePath.EndsWith(".txt", StringComparison.OrdinalIgnoreCase))
+            {
+                OpenGraphFile(filePath);
                 return true;
             }
 
@@ -758,6 +769,40 @@ Use project(.) or project(.csproj) to search all projects (slow)." };
         private async void Open_Click(object sender, RoutedEventArgs e)
         {
             await OpenLogFile();
+        }
+
+        private async void OpenGraph_Click(object sender, RoutedEventArgs e)
+        {
+            var files = await TopLevel.GetTopLevel(this)!.StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
+            {
+                Title = "Open a graph file",
+                FileTypeFilter = new[] { FilePickerFileTypes.All }
+            });
+
+            if (files.FirstOrDefault()?.Path is { IsAbsoluteUri: true, Scheme: "file" } uri)
+            {
+                OpenGraphFile(uri.LocalPath);
+            }
+        }
+
+        public void OpenGraphFile(string filePath)
+        {
+            DisplayBuild(null);
+
+            try
+            {
+                SetContent(GraphHostControl.FromFile(filePath, async text =>
+                {
+                    var clipboard = TopLevel.GetTopLevel(this)?.Clipboard;
+                    if (clipboard != null)
+                    {
+                        await clipboard.SetTextAsync(text);
+                    }
+                }));
+            }
+            catch
+            {
+            }
         }
 
         private async void Build_Click(object sender, RoutedEventArgs e)

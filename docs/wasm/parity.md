@@ -6,12 +6,12 @@ TextViewerControl and DocumentWell between the WPF and Avalonia code, plus the W
 The Avalonia column is the status of the shared UI; the browser column says works, or N/A with the reason. Effort: S hours, M a day, L several days.
 "to verify" means the code exists but is not yet exercised in the browser.
 
-Counts (Avalonia): present 58, partial 2, missing 4, N/A 1  (total 65)
+Counts (Avalonia): present 59, partial 2, missing 3, N/A 1  (total 65)
 
 | Area | Feature | Avalonia | Browser | Effort | Notes |
 |---|---|---|---|---|---|
 | Main window | File > Open Log (Ctrl+O) | present | works (file picker, drag and drop, ?url=) | - |  |
-| Main window | File > Open Graph (.dgml/.graph) | missing | works once ported | M | WPF OpenGraph; needs graph view |
+| Main window | File > Open Graph (.dgml/.graph) | present | N/A: no file dialog path; desktop head only (graph files open via the picker) | - | GraphHostControl.FromFile; MainWindow menu + drop of .dgml/.graph/.txt |
 | Main window | File > Reload (F5) | present | N/A: no file path on disk; re-open the log | - | browser reloads from the original ?url= only |
 | Main window | File > Save Log As (Ctrl+S) | present | partial: download of a binlog written by the logger | S | verify with big logs in browser |
 | Main window | File > Redact Secrets (Ctrl+R) | present | to verify in browser | S | RedactInputControl exists |

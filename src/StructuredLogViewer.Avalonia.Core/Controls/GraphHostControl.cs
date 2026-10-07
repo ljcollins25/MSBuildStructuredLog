@@ -40,6 +40,25 @@ namespace StructuredLogViewer.Avalonia.Controls
 
         public GraphControl GraphControl => graphControl;
 
+        /// <summary>Loads a .dgml/.graph/.txt edge list the way WPF OpenGraphFile does.</summary>
+        public static GraphHostControl FromFile(string filePath, Action<string> displayText = null)
+        {
+            var graph = Digraph.Load(filePath);
+            graph.RemoveCycles();
+            graph.CalculateHeight();
+            graph.CalculateDepth();
+            graph.ComputeTransitiveReduction();
+
+            var host = new GraphHostControl();
+            if (displayText != null)
+            {
+                host.DisplayText += displayText;
+            }
+
+            host.Graph = graph;
+            return host;
+        }
+
         public Digraph Graph
         {
             get => graph;

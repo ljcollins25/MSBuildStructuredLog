@@ -138,6 +138,17 @@ namespace StructuredLogViewer.Avalonia
             Console.WriteLine("property graph vertices: " + (pg?.GraphControl.DisplayedCount ?? -1));
             if (pg == null || pg.GraphControl.DisplayedCount == 0) graphFailures++;
 
+            var graphFile = Environment.GetEnvironmentVariable("HEXAD_SCRATCH") is { } scratch ? Path.Combine(scratch, "sample.graph") : null;
+            if (graphFile != null && File.Exists(graphFile))
+            {
+                window.OpenGraphFile(graphFile);
+                Pump(1000);
+                Save(window, Path.Combine(outDir, "desktop-10-open-graph.png"));
+                var openedHost = window.GetVisualDescendants().OfType<GraphHostControl>().FirstOrDefault();
+                Console.WriteLine("open graph vertices: " + (openedHost?.GraphControl.DisplayedCount ?? -1));
+                if (openedHost == null || openedHost.GraphControl.DisplayedCount != 5) graphFailures++;
+            }
+
             return control.searchLogControl.ResultsList.ItemCount > 0 && control.TracingControl.BlockCount > 0 && graphFailures == 0 ? 0 : 1;
         }
 
