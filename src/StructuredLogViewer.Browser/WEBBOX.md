@@ -37,3 +37,11 @@ It serves the site under `/webbox/binlog/` like Pages (gzip text, no encoding fo
 ```
 
 Stage with `mkdir -p _site/binlog && cp -r _binlog_pages/. _site/binlog/` (Pages) and `mkdir -p _cf_site/binlog && cp -r _binlog_cf/. _cf_site/binlog/; cat _binlog_headers >> _cf_site/_headers` (Cloudflare, after the other stages wrote `_headers`). Exclude `/binlog-src`, `/_binlog_pages` and `/_binlog_cf` from the repo rsync copies.
+
+## Verified end to end
+
+`build-static.sh <out> --target=pages` (22 MiB, .br binaries decoded in the page) and
+`--target=cloudflare --base=/binlog --headers=<file>` (17 MiB, no .br) were both run from a clean obj, and
+`node tools/e2e.mjs <out> <binlog>` passed on each: open by drop and ?url=, search, task selection, source file,
+Timeline tab, Copy Path (clipboard), Save (download), dark theme persisted in localStorage across a reload, no console
+errors or 4xx responses.
