@@ -6,7 +6,7 @@ TextViewerControl and DocumentWell between the WPF and Avalonia code, plus the W
 The Avalonia column is the status of the shared UI; the browser column says works, or N/A with the reason. Effort: S hours, M a day, L several days.
 "to verify" means the code exists but is not yet exercised in the browser.
 
-Counts (Avalonia): present 59, partial 2, missing 3, N/A 1  (total 65)
+Counts (Avalonia): present 60, partial 2, missing 4, N/A 1  (total 67)
 
 | Area | Feature | Avalonia | Browser | Effort | Notes |
 |---|---|---|---|---|---|
@@ -17,7 +17,9 @@ Counts (Avalonia): present 59, partial 2, missing 3, N/A 1  (total 65)
 | Main window | File > Redact Secrets (Ctrl+R) | present | to verify in browser | S | RedactInputControl exists |
 | Main window | File > Statistics | present | to verify in browser | S | Build.DisplayStats |
 | Main window | Recent Logs / Recent Projects, Clear | present | works (localStorage); recent logs hold names only | S | paths cannot be reopened in a browser |
-| Main window | Start Page, welcome screen | present | works | - |  |
+| Main window | Start Page, welcome screen | present | works: shared WelcomeScreen; Open Project/Solution hidden (needs MSBuild) | - | WelcomeScreen.ShowOpenProject/ShowOpenFromUrl |
+| Main window | Open from URL (start page box and ?url=) | present | works: HTTP Range when the server supports it (else one download); CORS, HTML and non-binlog responses give a clear message on the start page | - | browser-only; ILogSource/ILogSourceProvider (LogSource.cs) is the plug-in point for the paged reader; e2e covers CORS, no-Range, 404, HTML |
+| Main window | Enable tree virtualization (setting) | missing | missing: Avalonia TreeView cannot virtualize; every expanded node is a live control, so a node with ~50k children is slow and memory-hungry | L | App.xaml comment: only the root level virtualizes and it breaks AutoScrollToSelectedItem (AvaloniaUI/Avalonia#10985). Real fix is TreeDataGrid, under evaluation |
 | Main window | Build / Rebuild Solution/Project (F6, Shift+F6) | present | N/A: runs MSBuild, a browser cannot start processes | - | to hide |
 | Main window | Set MSBuild path | present | N/A: no MSBuild in a browser | - | to hide |
 | Main window | Help: Search Syntax, links, About | present | works | S | links open in a new tab |
