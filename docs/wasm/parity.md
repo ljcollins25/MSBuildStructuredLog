@@ -6,7 +6,7 @@ TextViewerControl and DocumentWell between the WPF and Avalonia code, plus the W
 The Avalonia column is the status of the shared UI; the browser column says works, or N/A with the reason. Effort: S hours, M a day, L several days.
 "to verify" means the code exists but is not yet exercised in the browser.
 
-Counts (Avalonia): present 60, partial 2, missing 4, N/A 1  (total 67)
+Counts (Avalonia): present 63, partial 0, missing 3, N/A 1  (total 67)
 
 | Area | Feature | Avalonia | Browser | Effort | Notes |
 |---|---|---|---|---|---|
@@ -25,11 +25,11 @@ Counts (Avalonia): present 60, partial 2, missing 4, N/A 1  (total 67)
 | Main window | Help: Search Syntax, links, About | present | works | S | links open in a new tab |
 | Main window | Exit (Alt+F4) | present | N/A: no window to close | - | to hide |
 | Main window | Open in VS Code, VS Code variant dropdown, hint bar | missing | N/A: starts a local program | - | desktop-only; port the buttons to the Avalonia head later |
-| Main window | Attach binlog (multi-log) button | missing | works if VS Code integration is not needed | S | BuildControl.AttachBinlog exists |
+| Main window | Attach binlog (multi-log) button | present | N/A: it only adds binlogs to the VS Code hand-off, which a browser cannot start | - | BuildControl.AttachBinlog stays for the desktop head |
 | Main window | Exception panel (shows and copies error text) | present | works | - |  |
 | Main window | Ctrl+mouse wheel zoom of the whole UI | present | works | - |  |
-| Main window | Ctrl+F / Ctrl+Shift+F global search shortcuts | partial | works | S | Ctrl+F present; check Ctrl+Shift+F |
-| Main window | Ctrl+C copy, Ctrl+0 reset zoom | partial | works | S | check both |
+| Main window | Ctrl+F / Ctrl+Shift+F global search shortcuts | present | works (BrowserShell, TopLevel key handler; e2e checks Ctrl+Shift+F) | - |  |
+| Main window | Ctrl+C copy, Ctrl+0 reset zoom | present | Ctrl+C copies the tree selection (as in the tree row below); the desktop window's own Ctrl+C only copies the build command line (N/A). Ctrl+0 / Ctrl+wheel are the browser's native page zoom | - |  |
 | Main window | Window position save/restore | present | N/A: no window | - |  |
 | Main window | Auto-update (Squirrel) | N/A (WPF only) | N/A: the browser always runs the deployed version | - |  |
 | Main window | Drag and drop of a log file | present | works | - |  |
@@ -77,6 +77,12 @@ Counts (Avalonia): present 60, partial 2, missing 4, N/A 1  (total 67)
 | Other | Secrets search ($secret) | present | works | - |  |
 | Other | Preprocess with imports inlined | present | works | - |  |
 | Other | Icons and node templates | present | works | - |  |
+
+## Tree virtualization and TreeDataGrid (evaluated)
+- Gap: WPF has "Enable tree virtualization"; Avalonia's TreeView cannot virtualize expanded descendants (only the root level; it also breaks AutoScrollToSelectedItem, AvaloniaUI/Avalonia#10985). Every expanded node is a live control, so a node with tens of thousands of children is slow and uses a lot of memory.
+- TreeDataGrid: this project is on Avalonia 12.0.1. The package line for Avalonia 12 (Avalonia.Controls.TreeDataGrid 12.x, .NET 8+, depends on AvaloniaUI.Licensing) needs a paid Avalonia Accelerate licence since 11.2.0; the last MIT release is the 11.1.x line, which does not run on Avalonia 12. The open-source repository was archived in October 2025. So it is not adoptable without a licence decision, and it was not prototyped.
+- Scope even with a licence: the main tree is TreeView-based in BuildControl (about 80 treeView references, TreeViewItem styles for expand/select/visibility, SelectedTreeViewItem / TreeContainerFromItem, right-click selection, keyboard handlers, per-node templates in App.xaml, the search-result dot). TreeDataGrid wants one row model and a template column with an expander; roughly 1-2 weeks including the e2e and measurements.
+- Licence-free option: a flat, virtualized list (ListBox/ItemsControl with VirtualizingStackPanel) over the currently visible rows, with indentation, an expander glyph, and ScrollIntoView for scroll-to-result. Same size of work, no new dependency.
 
 ## Plan (order)
 1. Context-menu and copy parity: Go to submenu, graph and tracing entries (as the views land).

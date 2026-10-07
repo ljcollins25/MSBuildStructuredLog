@@ -62,7 +62,7 @@ async function visit(context, address) {
     const page = await context.newPage();
     await page.setViewportSize({ width: 1400, height: 900 });
     const errors = [], failed = [];
-    page.on('console', m => { if (m.type() === 'error') errors.push(m.text()); });
+    page.on('console', m => { if (/KEY /.test(m.text())) console.log('console: ' + m.text()); if (m.type() === 'error') errors.push(m.text()); });
     page.on('pageerror', e => errors.push('pageerror: ' + e.message));
     page.on('requestfailed', r => failed.push(r.url() + ' ' + (r.failure()?.errorText ?? '')));
     const state = () => page.evaluate(() => JSON.parse(globalThis.binlogBrowser?.GetState() ?? '{}')).catch(() => ({}));
@@ -132,11 +132,15 @@ try {
 
     // ---- shortcuts ----
     await v.page.mouse.click(700, 450);
-    await v.page.keyboard.press('Control+Shift+F');
+    await v.page.waitForTimeout(300);
+    // synthetic key events on Avalonia's input element (headless focus does not reach it; a real press would)
+    const press = (key, code, shift) => v.page.evaluate(([key, code, shift]) => { const i = document.querySelector('.avalonia-container input'); i.focus();
+        for (const t of ['keydown', 'keyup']) i.dispatchEvent(new KeyboardEvent(t, { key, code, ctrlKey: true, shiftKey: shift, bubbles: true, cancelable: true })); }, [key, code, shift]);
+    await press('F', 'KeyF', true);
     await v.page.waitForTimeout(500);
     s = await v.state();
     check(s.leftTab === 'findInFilesTab', 'Ctrl+Shift+F opens Find in Files: ' + s.leftTab + ' (tab available: ' + s.findInFiles + ')');
-    await v.page.keyboard.press('Control+F');
+    await press('f', 'KeyF', false);
     await v.page.waitForTimeout(300);
     await shot('e2e-1b-shortcut.png');
 
