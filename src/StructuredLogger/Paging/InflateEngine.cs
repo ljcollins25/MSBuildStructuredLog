@@ -99,9 +99,71 @@ namespace Microsoft.Build.Logging.StructuredLogger.Paging
         private readonly int[] countScratch = new int[16];
         private readonly int[] nextScratch = new int[16];
 
+        private static readonly uint[] CrcTable = MakeCrcTable();
+        private uint crc;
+        private int crcPos = WindowSize;
+
+        private static uint[] MakeCrcTable()
+        {
+            var table = new uint[8 * 256];
+            for (uint i = 0; i < 256; i++)
+            {
+                uint c = i;
+                for (int k = 0; k < 8; k++)
+                {
+                    c = (c & 1) != 0 ? 0xEDB88320u ^ (c >> 1) : c >> 1;
+                }
+
+                table[i] = c;
+            }
+
+            // slicing-by-8 tables
+            for (int i = 0; i < 256; i++)
+            {
+                uint c = table[i];
+                for (int t = 1; t < 8; t++)
+                {
+                    c = table[c & 0xFF] ^ (c >> 8);
+                    table[t * 256 + i] = c;
+                }
+            }
+
+            return table;
+        }
+
+        /// <summary>Updates the running CRC-32 of the current gzip member with the output not yet covered.</summary>
+        private void UpdateCrc()
+        {
+            if (!gzip)
+            {
+                return;
+            }
+
+            uint c = ~crc;
+            byte[] b = buf;
+            uint[] t = CrcTable;
+            int i = crcPos;
+            int end = outPos;
+            for (; i + 8 <= end; i += 8)
+            {
+                uint lo = (c ^ (uint)(b[i] | (b[i + 1] << 8) | (b[i + 2] << 16) | (b[i + 3] << 24)));
+                uint hi = (uint)(b[i + 4] | (b[i + 5] << 8) | (b[i + 6] << 16) | (b[i + 7] << 24));
+                c = t[7 * 256 + (lo & 0xFF)] ^ t[6 * 256 + ((lo >> 8) & 0xFF)] ^ t[5 * 256 + ((lo >> 16) & 0xFF)] ^ t[4 * 256 + (lo >> 24)]
+                    ^ t[3 * 256 + (hi & 0xFF)] ^ t[2 * 256 + ((hi >> 8) & 0xFF)] ^ t[1 * 256 + ((hi >> 16) & 0xFF)] ^ t[hi >> 24];
+            }
+
+            for (; i < end; i++)
+            {
+                c = t[(c ^ b[i]) & 0xFF] ^ (c >> 8);
+            }
+
+            crc = ~c;
+            crcPos = end;
+        }
+
         private readonly List<SeekPoint> recordInto;
         private readonly long spacingBytes;
-        private long lastPointByte = long.MinValue;
+        private long lastPointByte;
         private bool pointDue = true;
         private long memberOutputStart;
 
@@ -224,6 +286,7 @@ namespace Microsoft.Build.Logging.StructuredLogger.Paging
             outPos = WindowSize;
             readPos = WindowSize;
             validFrom = 0;
+            crcPos = WindowSize; // everything was covered when it was decoded
         }
 
         private void Decode()
@@ -257,6 +320,8 @@ namespace Microsoft.Build.Logging.StructuredLogger.Paging
                 Truncated = true;
                 state = State.Done;
             }
+
+            UpdateCrc();
         }
 
         private sealed class EndOfInputException : Exception
@@ -413,6 +478,8 @@ namespace Microsoft.Build.Logging.StructuredLogger.Paging
             }
 
             memberOutputStart = outBase + outPos;
+            crc = 0;
+            crcPos = outPos;
             state = State.BlockHeader;
             pointDue = true; // always have a point at the start of a member (empty window)
         }
@@ -420,10 +487,10 @@ namespace Microsoft.Build.Logging.StructuredLogger.Paging
         private void ReadGzipTrailer()
         {
             AlignToByte();
-            uint crc = 0;
+            uint expectedCrc = 0;
             for (int i = 0; i < 4; i++)
             {
-                crc |= (uint)NeedAlignedByte() << (8 * i);
+                expectedCrc |= (uint)NeedAlignedByte() << (8 * i);
             }
 
             uint isize = 0;
@@ -432,12 +499,13 @@ namespace Microsoft.Build.Logging.StructuredLogger.Paging
                 isize |= (uint)NeedAlignedByte() << (8 * i);
             }
 
-            // The CRC is not verified here (it would cost a pass over all the output and a seek read
-            // can not verify it anyway); the length check catches most truncation and corruption.
-            if (isize != (uint)(outBase + outPos - memberOutputStart))
+            UpdateCrc();
+            if (crc != expectedCrc || isize != (uint)(outBase + outPos - memberOutputStart))
             {
-                throw new InvalidDataException("The gzip trailer length does not match the decompressed length.");
+                throw new InvalidDataException("The gzip trailer does not match the decompressed data (CRC-32 or length).");
             }
+
+            crc = 0;
 
             // a window does not carry over to a following member
             validFrom = outPos;
