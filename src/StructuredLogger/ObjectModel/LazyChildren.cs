@@ -140,4 +140,31 @@ namespace Microsoft.Build.Logging.StructuredLogger
             return list;
         }
     }
+
+    /// <summary>
+    /// Name/value children backed by a dictionary that is shared with the record that was read (item metadata
+    /// of the binary log); the nodes are created when the children are requested.
+    /// </summary>
+    internal sealed class LazyDictionary<T> : LazyChildren where T : NameValueNode, new()
+    {
+        private readonly IDictionary<string, string> dictionary;
+
+        public LazyDictionary(IDictionary<string, string> dictionary)
+        {
+            this.dictionary = dictionary;
+        }
+
+        public override int Count => dictionary.Count;
+
+        public override IList<BaseNode> Create(TreeNode parent)
+        {
+            var list = new ChildrenList(dictionary.Count);
+            foreach (var pair in dictionary)
+            {
+                list.Add(new T { Name = pair.Key, Value = pair.Value });
+            }
+
+            return list;
+        }
+    }
 }

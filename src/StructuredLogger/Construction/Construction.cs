@@ -306,35 +306,7 @@ namespace Microsoft.Build.Logging.StructuredLogger
                             var item = new Item();
                             item.Text = SoftIntern(targetOutput.ItemSpec);
 
-                            var metadataArray = targetOutput.CloneCustomMetadata();
-                            if (metadataArray.Count > 0)
-                            {
-                                if (metadataArray is ArrayDictionary<string, string> array)
-                                {
-                                    foreach (var metadata in array)
-                                    {
-                                        var metadataNode = new Metadata();
-                                        metadataNode.Name = SoftIntern(metadata.Key);
-                                        metadataNode.Value = SoftIntern(metadata.Value);
-                                        item.AddChild(metadataNode);
-                                    }
-                                }
-                                else
-                                {
-                                    // This should be unreachable or legacy scenarios only
-                                    // (someone passing StructuredLogger directly to MSBuild)
-                                    foreach (DictionaryEntry metadata in metadataArray)
-                                    {
-                                        if (metadata.Key is string key && metadata.Value is string value)
-                                        {
-                                            var metadataNode = new Metadata();
-                                            metadataNode.Name = SoftIntern(key);
-                                            metadataNode.Value = SoftIntern(value);
-                                            item.AddChild(metadataNode);
-                                        }
-                                    }
-                                }
-                            }
+                            AddMetadata(targetOutput, item);
 
                             targetOutputsFolder.AddChild(item);
                         }
@@ -1082,6 +1054,13 @@ namespace Microsoft.Build.Logging.StructuredLogger
                 // keep the metadata as the two arrays of the shared name/value record,
                 // the Metadata nodes are only created when the children of the item are requested
                 itemNode.TrySetLazyChildren(new LazyNameValues<Metadata>(metadata.KeyArray, metadata.ValueArray, count));
+            }
+            else if (cloned is IDictionary<string, string> shared)
+            {
+                if (shared.Count > 0)
+                {
+                    itemNode.TrySetLazyChildren(new LazyDictionary<Metadata>(shared));
+                }
             }
             else
             {
