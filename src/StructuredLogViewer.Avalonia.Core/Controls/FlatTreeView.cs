@@ -566,6 +566,7 @@ namespace StructuredLogViewer.Avalonia.Controls
         private readonly ContentControl content;
         private FlatRow row;
         private bool attached;
+        private TextBlock cheap;
 
         public FlatRowVisual(double indentWidth)
         {
@@ -596,10 +597,11 @@ namespace StructuredLogViewer.Avalonia.Controls
                     e.Handled = true;
                 }
             };
+            if (Environment.GetEnvironmentVariable("FLAT_CHEAP") == "1") { cheap = new TextBlock { VerticalAlignment = global::Avalonia.Layout.VerticalAlignment.Center }; }
             content = new ContentControl { VerticalAlignment = global::Avalonia.Layout.VerticalAlignment.Center, Focusable = false };
             Children.Add(indent);
             Children.Add(expander);
-            Children.Add(content);
+            Children.Add(cheap ?? (Control)content);
         }
 
         protected override void OnDataContextChanged(EventArgs e)
@@ -628,7 +630,7 @@ namespace StructuredLogViewer.Avalonia.Controls
             }
 
             indent.Width = Math.Max(0, row.Depth) * indentWidth;
-            content.Content = row.Node;
+            if (cheap != null) cheap.Text = row.Node.ToString(); else content.Content = row.Node;
             Update();
         }
 
