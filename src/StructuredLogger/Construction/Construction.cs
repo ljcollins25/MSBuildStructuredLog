@@ -1081,7 +1081,7 @@ namespace Microsoft.Build.Logging.StructuredLogger
 
                 // keep the metadata as the two arrays of the shared name/value record,
                 // the Metadata nodes are only created when the children of the item are requested
-                itemNode.TrySetLazyChildren(new LazyMetadata(metadata.KeyArray, metadata.ValueArray, count));
+                itemNode.TrySetLazyChildren(new LazyNameValues<Metadata>(metadata.KeyArray, metadata.ValueArray, count));
             }
             else
             {
@@ -1329,18 +1329,18 @@ namespace Microsoft.Build.Logging.StructuredLogger
                 var keys = array.KeyArray;
                 var vals = array.ValueArray;
                 int n = array.Count;
-                if (project != null)
+                if (parent.TrySetLazyChildren(new LazyNameValues<Property>(keys, vals, n)))
                 {
-                    for (int i = 0; i < n; i++)
+                    if (project != null)
                     {
-                        ApplyProjectProperty(project, keys[i], vals[i], ref targetFramework, ref targetFrameworks, ref targetFrameworkVersion);
+                        for (int i = 0; i < n; i++)
+                        {
+                            ApplyProjectProperty(project, keys[i], vals[i], ref targetFramework, ref targetFrameworks, ref targetFrameworkVersion);
+                        }
+
+                        ApplyTargetFramework(project, targetFramework, targetFrameworks, targetFrameworkVersion);
                     }
 
-                    ApplyTargetFramework(project, targetFramework, targetFrameworks, targetFrameworkVersion);
-                }
-
-                if (parent.TrySetLazyChildren(new LazyProperties(keys, vals, n)))
-                {
                     return;
                 }
             }

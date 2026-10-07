@@ -6,17 +6,18 @@ namespace Microsoft.Build.Logging.StructuredLogger
 {
     /// <summary>
     /// A placeholder for the children of a node that have not been created yet. A node whose children
-    /// are derived from compact data (the metadata of an item) keeps only this small object until somebody
-    /// asks for <see cref="TreeNode.Children"/>, then the real nodes are created once and replace it.
-    /// <see cref="TreeNode.HasChildren"/> does not trigger the creation. It implements IList only so that it
-    /// fits the field of the node; TreeNode never exposes it, every member other than Count throws.
+    /// are derived from compact data (the metadata of an item, the properties of a project) keeps only
+    /// this small object until somebody asks for <see cref="TreeNode.Children"/>; then the real nodes are
+    /// created once and replace it. <see cref="TreeNode.HasChildren"/> does not trigger the creation.
+    /// It implements IList only so that it fits the field of the node; TreeNode never exposes it and every
+    /// member other than Count throws.
     /// </summary>
     internal abstract class LazyChildren : IList<BaseNode>
     {
         /// <summary>Number of children that <see cref="Create"/> will produce.</summary>
         public abstract int Count { get; }
 
-        /// <summary>Creates the child nodes; they get their Parent set by the caller.</summary>
+        /// <summary>Creates the child nodes; the caller sets their Parent.</summary>
         public abstract IList<BaseNode> Create(TreeNode parent);
 
         public bool IsReadOnly => true;
@@ -45,16 +46,17 @@ namespace Microsoft.Build.Logging.StructuredLogger
     }
 
     /// <summary>
-    /// The metadata of an item, as the two arrays of the name/value record they were read from. The record is
-    /// shared by all items that have the same metadata, so this placeholder can be shared too.
+    /// Name/value children (metadata of an item, properties of a project) kept as the two arrays of the
+    /// name/value record they were read from. The record is shared by all items that have the same metadata,
+    /// so the placeholder costs one small object per item instead of one node per entry.
     /// </summary>
-    internal sealed class LazyMetadata : LazyChildren
+    internal sealed class LazyNameValues<T> : LazyChildren where T : NameValueNode, new()
     {
         private readonly string[] names;
         private readonly string[] values;
         private readonly int count;
 
-        public LazyMetadata(string[] names, string[] values, int count)
+        public LazyNameValues(string[] names, string[] values, int count)
         {
             this.names = names;
             this.values = values;
@@ -68,35 +70,7 @@ namespace Microsoft.Build.Logging.StructuredLogger
             var list = new ChildrenList(count);
             for (int i = 0; i < count; i++)
             {
-                list.Add(new Metadata { Name = names[i], Value = values[i] });
-            }
-
-            return list;
-        }
-    }
-
-    /// <summary>The properties of a project or evaluation, as the arrays of the dictionary they were read from.</summary>
-    internal sealed class LazyProperties : LazyChildren
-    {
-        private readonly string[] names;
-        private readonly string[] values;
-        private readonly int count;
-
-        public LazyProperties(string[] names, string[] values, int count)
-        {
-            this.names = names;
-            this.values = values;
-            this.count = count;
-        }
-
-        public override int Count => count;
-
-        public override IList<BaseNode> Create(TreeNode parent)
-        {
-            var list = new ChildrenList(count);
-            for (int i = 0; i < count; i++)
-            {
-                list.Add(new Property { Name = names[i], Value = values[i] });
+                list.Add(new T { Name = names[i], Value = values[i] });
             }
 
             return list;

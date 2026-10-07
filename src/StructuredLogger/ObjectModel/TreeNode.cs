@@ -33,7 +33,7 @@ namespace Microsoft.Build.Logging.StructuredLogger
         }
 
         private IList<BaseNode> children;
-        public bool HasChildren => children != null && (children is LazyChildren lazy ? lazy.Count > 0 : children.Count > 0);
+        public bool HasChildren => children != null && children.Count > 0;
 
         public IList<BaseNode> Children
         {
@@ -52,33 +52,29 @@ namespace Microsoft.Build.Logging.StructuredLogger
             }
         }
 
-        private IList<BaseNode> RealizeChildren()
+        /// <summary>Turns a <see cref="LazyChildren"/> placeholder into the real child nodes (once).</summary>
+        private void RealizeChildren()
         {
-            var placeholder = children as LazyChildren;
-            if (placeholder == null)
+            if (children is LazyChildren placeholder)
             {
-                return children;
-            }
-
-            lock (placeholder)
-            {
-                if (ReferenceEquals(children, placeholder))
+                lock (placeholder)
                 {
-                    var created = placeholder.Create(this);
-                    foreach (var child in created)
+                    if (ReferenceEquals(children, placeholder))
                     {
-                        child.Parent = this;
-                    }
+                        var created = placeholder.Create(this);
+                        foreach (var child in created)
+                        {
+                            child.Parent = this;
+                        }
 
-                    children = created;
+                        children = created;
+                    }
                 }
             }
-
-            return children;
         }
 
         /// <summary>
-        /// Sets the children of a node that has none yet to be created on demand (see <see cref="LazyChildren"/>).
+        /// Gives a node that has no children yet a placeholder that creates them on demand.
         /// Returns false, and does nothing, when the node already has children.
         /// </summary>
         internal bool TrySetLazyChildren(LazyChildren lazy)
@@ -91,9 +87,6 @@ namespace Microsoft.Build.Logging.StructuredLogger
             children = lazy;
             return true;
         }
-
-        /// <summary>True while the children of this node are still a placeholder that was not turned into nodes.</summary>
-        internal bool HasLazyChildren => children is LazyChildren;
 
         protected ChildrenList CreateChildrenList()
         {
