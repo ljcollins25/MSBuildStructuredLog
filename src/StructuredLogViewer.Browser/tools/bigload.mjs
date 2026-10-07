@@ -52,9 +52,10 @@ console.log('state', JSON.stringify(state), 'seconds', (Date.now() - t0) / 1000)
 clearInterval(rssTimer);
 const wasmPeak = await page.evaluate(() => { let m = 0; for (const w of globalThis.__mems) { const x = w.deref(); if (x) m = Math.max(m, x.buffer.byteLength); } return Math.max(m, globalThis.__wasmPeak) / 1048576; }).catch(() => -1);
 console.log('RESULT', JSON.stringify({ capMb, timeToFirstTreeSec: tree, wasmMemoryMB: Math.round(wasmPeak), peakRendererRssMB: Math.round(peakRss / 1024) }));
+async function step(name, fn) { const t = Date.now(); try { const r = await page.evaluate(fn); console.log(name, JSON.stringify(r).slice(0, 200), (Date.now() - t) + 'ms'); } catch (e) { console.log(name, 'FAILED', String(e).slice(0, 200)); } }
 if (state.loaded) {
-  const t1 = Date.now(); console.log('biggest node', await page.evaluate(() => globalThis.binlogBrowser.SelectBiggestNode()), (Date.now() - t1) + 'ms');
-  const t2 = Date.now(); console.log('open embedded file', JSON.stringify(await page.evaluate(() => globalThis.binlogBrowser.OpenFirstSourceFile('.cs'))).slice(0, 200), (Date.now() - t2) + 'ms');
+  await step('search CoreCompile', () => globalThis.binlogBrowser.Search('CoreCompile'));
+  await step('open embedded file', () => globalThis.binlogBrowser.OpenFirstSourceFile('.cs'));
+  await step('biggest node', () => globalThis.binlogBrowser.SelectBiggestNode());
 }
-if (state.loaded) { const n = await page.evaluate(() => globalThis.binlogBrowser.Search('CoreCompile')); console.log('search results', n); }
 await browser.close(); srv.close();
