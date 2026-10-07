@@ -1,24 +1,13 @@
-using Avalonia;
-using Avalonia.Controls.ApplicationLifetimes;
-using Avalonia.Themes.Fluent;
+using StructuredLogViewer.Avalonia;
 
 namespace StructuredLogViewer.Browser
 {
-    public class App : Application
+    internal static class BrowserApp
     {
-        public override void Initialize()
+        /// <summary>Plugs the browser's single view into the shared App.</summary>
+        public static void Configure()
         {
-            Styles.Add(new FluentTheme());
-        }
-
-        public override void OnFrameworkInitializationCompleted()
-        {
-            if (ApplicationLifetime is ISingleViewApplicationLifetime singleView)
-            {
-                singleView.MainView = new MainView();
-            }
-
-            base.OnFrameworkInitializationCompleted();
+            App.CreateMainView = () => new BrowserShell();
         }
     }
 }

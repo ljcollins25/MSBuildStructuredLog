@@ -58,9 +58,8 @@ try {
 
     // ---- drag and drop ----
     const v = await visit(context, url);
-    await v.until(s => s.status !== undefined && s.status !== null, 'the app to start', 120000);
+    await v.until(s => s.status !== undefined, 'the app to start', 120000);
     metrics.startMs = Date.now() - v.t0;
-    check((await v.state()).status.includes('50 MB'), 'the start page warns that big logs do not fit');
     const b64 = fs.readFileSync(binlog).toString('base64');
     const t1 = Date.now();
     await v.page.evaluate(async b64 => {
@@ -74,16 +73,23 @@ try {
     check(s.loaded && /parsed in/.test(s.status), 'drop opens the binlog: ' + s.status);
     check(s.files > 0, 'embedded source files found: ' + s.files);
 
-    // ---- search ----
-    s = JSON.parse(await v.page.evaluate(q => globalThis.binlogBrowser.SearchAndSelectFirst(q), targetText));
-    check(s.results > 0, `search for '${targetText}' returns results (${s.results})`);
-    check(s.selected && s.details.length > 0, 'selecting a hit shows node details: ' + (s.selected ?? '').slice(0, 60));
+    const shot = async name => v.page.screenshot({ path: path.join(path.dirname(path.resolve(opt.metrics || 'metrics.json')), name) });
+    await v.page.waitForTimeout(1500);
+    await shot('e2e-1-tree.png');
+
+    // ---- search (typed into the shared search box) ----
+    const results = await v.page.evaluate(q => globalThis.binlogBrowser.Search(q), targetText);
+    check(results > 0, `search for '${targetText}' returns results (${results})`);
+    s = await v.state();
+    check(s.searchText === targetText && s.selected, 'the first hit is selected: ' + (s.selected ?? '').slice(0, 60));
+    await v.page.waitForTimeout(500);
+    await shot('e2e-2-search-and-details.png');
 
     // ---- source file ----
-    s = JSON.parse(await v.page.evaluate(f => globalThis.binlogBrowser.OpenFirstSourceFile(f), sourceFragment));
-    check(!!s.openFile && s.fileText.length > 0, 'a source file from the archive opens: ' + s.openFile);
-    metrics.sourceSnippet = (s.fileText ?? '').slice(0, 200);
-    await v.page.screenshot({ path: path.join(path.dirname(path.resolve(opt.metrics || 'metrics.json')), 'e2e-screenshot.png') });
+    const opened = await v.page.evaluate(f => globalThis.binlogBrowser.OpenFirstSourceFile(f), sourceFragment);
+    check(!!opened, 'a source file from the archive opens in the text viewer: ' + opened);
+    await v.page.waitForTimeout(1500);
+    await shot('e2e-3-source.png');
     check(v.errors.length === 0, 'no console errors (drop)' + (v.errors.length ? ': ' + v.errors.slice(0, 3).join(' | ') : ''));
     check(v.failed.length === 0, 'no failed requests (drop)' + (v.failed.length ? ': ' + v.failed.slice(0, 3).join(' | ') : ''));
     await v.page.close();

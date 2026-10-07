@@ -19,11 +19,11 @@
 
   <ItemGroup>
     <PackageReference Include="Avalonia.Browser" />
-    <PackageReference Include="Avalonia.Themes.Fluent" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\StructuredLogger\StructuredLogger.csproj" />
+    <ProjectReference Include="..\StructuredLogViewer.Avalonia.Core\StructuredLogViewer.Avalonia.Core.csproj" />
   </ItemGroup>
 
 </Project>
