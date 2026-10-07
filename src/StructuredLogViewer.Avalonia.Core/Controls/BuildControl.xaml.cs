@@ -102,7 +102,7 @@ namespace StructuredLogViewer.Avalonia.Controls
         private ContextMenu sharedTreeContextMenu;
         private ContextMenu filesTreeContextMenu;
         private TreeView treeView;
-        internal SearchAndResultsControl searchLogControl;
+        public SearchAndResultsControl searchLogControl;
         private SearchAndResultsControl findInFilesControl;
         private SearchAndResultsControl propertiesAndItemsControl;
         private TabItem filesTab;

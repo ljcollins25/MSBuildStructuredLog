@@ -1,5 +1,6 @@
 using System;
 using Avalonia;
+using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Threading;
 using Microsoft.Build.Logging.StructuredLogger;
@@ -29,6 +30,19 @@ namespace StructuredLogViewer.Avalonia
             };
 
             Dispatcher.UIThread.UnhandledException += OnDispatcherUnhandledException;
+
+            App.Initialized = app =>
+            {
+                MacOsEnvironmentExporter.InheritUserPath();
+#if DEBUG
+                app.AttachDeveloperTools();
+#endif
+                NativeDock.SetMenu(app, new NativeMenu
+                {
+                    new NativeMenuItem("New Instance") { Command = MacOsAppBundleRunner.NewInstanceCommand }
+                });
+            };
+            App.CreateMainWindow = () => new MainWindow();
 
             var app = BuildAvaloniaApp();
             int result = app.StartWithClassicDesktopLifetime(args);
