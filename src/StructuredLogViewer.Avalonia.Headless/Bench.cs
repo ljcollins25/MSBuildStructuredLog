@@ -115,6 +115,24 @@ namespace StructuredLogViewer.Avalonia
                     Console.WriteLine($"scroll_to_end_ms={all.Elapsed.TotalMilliseconds:N0} frames={times.Count} extent_px={viewer.Extent.Height:N0} frame_median_ms={times[times.Count / 2]:N1} frame_p95_ms={times[(int)(times.Count * 0.95)]:N1} frame_max_ms={times[^1]:N1}");
                 }
 
+                // wheel-like scrolling: 3 rows (~54 px) per frame for 300 frames from the top of the big node
+                {
+                    var small = new System.Collections.Generic.List<double>();
+                    viewer.Offset = new Vector(0, 0);
+                    Pump(50);
+                    for (int i = 0; i < 300; i++)
+                    {
+                        var f2 = Stopwatch.StartNew();
+                        viewer.Offset = new Vector(0, Math.Min(viewer.Offset.Y + 54, viewer.Extent.Height - viewer.Viewport.Height));
+                        Dispatcher.UIThread.RunJobs();
+                        AvaloniaHeadlessPlatform.ForceRenderTimerTick();
+                        small.Add(f2.Elapsed.TotalMilliseconds);
+                    }
+
+                    small.Sort();
+                    Console.WriteLine($"wheel_scroll frames={small.Count} frame_median_ms={small[small.Count / 2]:N1} frame_p95_ms={small[(int)(small.Count * 0.95)]:N1} frame_max_ms={small[^1]:N1}");
+                }
+
                 Save(window, Path.Combine(outDir, "bench-3-scrolled-end.png"));
             }
 
